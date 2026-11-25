@@ -8,6 +8,9 @@ import { SEARCH_HELP } from "./commands/search.js";
 import { ATTACHMENT_HELP } from "./commands/attachment.js";
 import { API_HELP } from "./commands/api.js";
 import { SETUP_HELP } from "./commands/setup.js";
+import { ACTIVITIES_HELP } from "./commands/activities.js";
+import { SETTINGS_HELP, METADATA_HELP, ADMIN_HELP, PIPELINES_HELP, NOTIFICATION_HELP } from "./commands/tools.js";
+import { MASS_HELP, EXPORT_HELP } from "./commands/mass.js";
 
 /**
  * Single source of truth for the command surface: drives `--help`, the
@@ -26,6 +29,21 @@ export const COMMAND_NAMES = [
   "attachment",
   "api",
   "setup",
+  "activities",
+  "settings",
+  "metadata",
+  "admin",
+  "currency",
+  "openapi",
+  "i18n",
+  "pipelines",
+  "pipeline-stages",
+  "pipeline",
+  "pipeline-stage",
+  "kanban",
+  "notification",
+  "mass",
+  "export",
   ...Object.keys(SHORTCUTS),
 ] as const;
 
@@ -40,5 +58,20 @@ export const COMMAND_HELP: Record<string, string> = {
   attachment: ATTACHMENT_HELP,
   api: API_HELP,
   setup: SETUP_HELP,
+  activities: ACTIVITIES_HELP,
+  settings: SETTINGS_HELP,
+  metadata: METADATA_HELP,
+  admin: ADMIN_HELP,
+  currency: ADMIN_HELP,
+  openapi: ADMIN_HELP,
+  i18n: METADATA_HELP,
+  pipelines: PIPELINES_HELP,
+  "pipeline-stages": PIPELINES_HELP,
+  pipeline: PIPELINES_HELP,
+  "pipeline-stage": PIPELINES_HELP,
+  kanban: PIPELINES_HELP,
+  notification: NOTIFICATION_HELP,
+  mass: MASS_HELP,
+  export: EXPORT_HELP,
   ...Object.fromEntries(Object.entries(SHORTCUTS).map(([name]) => [name, shortcutHelp(name)])),
 };

@@ -13,6 +13,9 @@ import { searchCommand } from "./commands/search.js";
 import { attachmentCommand } from "./commands/attachment.js";
 import { apiCommand } from "./commands/api.js";
 import { setupCommand } from "./commands/setup.js";
+import { activitiesCommand } from "./commands/activities.js";
+import { settingsCommand, metadataCommand, adminCommand, pipelinesCommand, notificationCommand } from "./commands/tools.js";
+import { massCommand, exportCommand } from "./commands/mass.js";
 
 export const DESCRIPTION =
   "EspoCRM for agents - records for any entity type, inbox and email sending, stream, activities, admin tools over the EspoCRM REST API";
@@ -34,6 +37,11 @@ function bind(handler: (args: string[], ctx: CommandContext) => Promise<unknown>
   return handler as AxiCliCommand<CommandContext>;
 }
 
+/** The SDK strips the top-level command word; multi-word families need it re-inserted. */
+function reinsert(word: string, handler: (args: string[], ctx: CommandContext) => Promise<unknown>): AxiCliCommand<CommandContext> {
+  return ((args: string[], ctx: CommandContext) => handler([word, ...args], ctx)) as AxiCliCommand<CommandContext>;
+}
+
 const commands: Record<string, AxiCliCommand<CommandContext>> = {
   me: bind(meCommand),
   auth: bind(authCommand),
@@ -45,6 +53,21 @@ const commands: Record<string, AxiCliCommand<CommandContext>> = {
   attachment: bind(attachmentCommand),
   api: bind(apiCommand),
   setup: ((args: string[]) => setupCommand(args)) as AxiCliCommand<CommandContext>,
+  activities: bind(activitiesCommand),
+  settings: bind(settingsCommand),
+  metadata: bind(metadataCommand),
+  admin: bind(adminCommand),
+  currency: reinsert("currency", adminCommand),
+  openapi: reinsert("openapi", adminCommand),
+  i18n: reinsert("i18n", metadataCommand),
+  pipelines: bind(pipelinesCommand),
+  "pipeline-stages": bind(pipelinesCommand),
+  pipeline: bind(pipelinesCommand),
+  "pipeline-stage": bind(pipelinesCommand),
+  kanban: reinsert("kanban", pipelinesCommand),
+  notification: bind(notificationCommand),
+  mass: bind(massCommand),
+  export: bind(exportCommand),
   ...Object.fromEntries(Object.entries(SHORTCUTS).map(([name]) => [name, bind(shortcutCommand(name))])),
 };
 

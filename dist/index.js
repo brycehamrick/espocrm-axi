@@ -13,6 +13,9 @@ import { searchCommand } from "./commands/search.js";
 import { attachmentCommand } from "./commands/attachment.js";
 import { apiCommand } from "./commands/api.js";
 import { setupCommand } from "./commands/setup.js";
+import { activitiesCommand } from "./commands/activities.js";
+import { settingsCommand, metadataCommand, adminCommand, pipelinesCommand, notificationCommand } from "./commands/tools.js";
+import { massCommand, exportCommand } from "./commands/mass.js";
 export const DESCRIPTION = "EspoCRM for agents - records for any entity type, inbox and email sending, stream, activities, admin tools over the EspoCRM REST API";
 const TOP_LEVEL_HELP = `espocrm-axi - ${DESCRIPTION}
 
@@ -29,6 +32,10 @@ all writes require --confirm. run \`espocrm-axi <command> --help\` for details.`
 function bind(handler) {
     return handler;
 }
+/** The SDK strips the top-level command word; multi-word families need it re-inserted. */
+function reinsert(word, handler) {
+    return ((args, ctx) => handler([word, ...args], ctx));
+}
 const commands = {
     me: bind(meCommand),
     auth: bind(authCommand),
@@ -40,6 +47,21 @@ const commands = {
     attachment: bind(attachmentCommand),
     api: bind(apiCommand),
     setup: ((args) => setupCommand(args)),
+    activities: bind(activitiesCommand),
+    settings: bind(settingsCommand),
+    metadata: bind(metadataCommand),
+    admin: bind(adminCommand),
+    currency: reinsert("currency", adminCommand),
+    openapi: reinsert("openapi", adminCommand),
+    i18n: reinsert("i18n", metadataCommand),
+    pipelines: bind(pipelinesCommand),
+    "pipeline-stages": bind(pipelinesCommand),
+    pipeline: bind(pipelinesCommand),
+    "pipeline-stage": bind(pipelinesCommand),
+    kanban: reinsert("kanban", pipelinesCommand),
+    notification: bind(notificationCommand),
+    mass: bind(massCommand),
+    export: bind(exportCommand),
     ...Object.fromEntries(Object.entries(SHORTCUTS).map(([name]) => [name, bind(shortcutCommand(name))])),
 };
 export async function main() {

@@ -44,6 +44,8 @@ export const SHORTCUTS: Record<string, Shortcut> = {
   "email-template": { type: "EmailTemplate", label: "Email templates", filters: { type: "type" }, commonFields: ["name", "subject", "body", "isHtml", "type", "entityType", "assignedUserId", "teamsIds"] },
   role: { type: "Role", label: "Roles (permission tables)", filters: {}, commonFields: ["name", "table"] },
   webhook: { type: "Webhook", label: "Webhooks (admin)", filters: { event: "event" }, commonFields: ["name", "event", "url", "isActive", "secret"] },
+  job: { type: "Job", label: "Jobs (queue entries)", filters: { status: "status", "scheduled-job": "scheduledJobId" }, commonFields: ["name", "status", "executeTime", "attempts", "scheduledJobId"] },
+  "scheduled-job": { type: "ScheduledJob", label: "Scheduled jobs (cron definitions)", filters: { status: "status" }, commonFields: ["name", "status", "job", "scheduling"] },
   product: { type: "Product", label: "Products (Sales Pack)", filters: { type: "type" }, commonFields: ["name", "type", "code", "unitPrice", "isActive", "taxRate", "teamsIds"] },
 };
 
