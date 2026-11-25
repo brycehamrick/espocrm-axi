@@ -77,6 +77,7 @@ A global install (`npm i -g espocrm-axi`) is only needed for `setup hooks`.
   reversible and ungated.
 - `email get` marks the message read; use `email inbox` / `email folder <name>` to browse
   without side effects. Never create an Email with `status=Sent` directly - it is never
-  transmitted. A fresh send from a team mailbox appears in your Sent view; only replies
-  to team-folder mail stay in that folder.
+  transmitted. A fresh send from a team mailbox appears in your Sent view; replies to
+  team-folder mail carry the folder but are listed under `email sent` / `email thread`
+  (the folder view hides your own sent mail).
 - Secret-named fields (apiKey, password, token) are masked in all output, including `--json`.

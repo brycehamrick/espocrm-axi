@@ -61,7 +61,10 @@ base64 data URL, `relatedType: "Email"`, `field: "attachments"`), then reference
 - Sending **as** the team inbox is `--from collabs@example.com`: the server accepts it
   when the group account is shared with you and has SMTP. A fresh send lands in your
   Sent view (`groupFolderId` null). A **reply** to a group-folder message inherits the
-  group folder and, in this CLI, defaults `--from` to that mailbox.
+  group folder (`groupFolderName` is set on the record) and, in this CLI, defaults
+  `--from` to that mailbox. The folder *listing* excludes your own sent replies
+  (the server filters `status=Sent` created by you), so find them with `email sent`
+  or `email thread <originalId>`.
 - `email send|reply --dry-run` prints the resolved payload (from/to/subject/parent/
   repliedId) without uploading or sending.
 

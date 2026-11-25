@@ -104,7 +104,8 @@ sessions without an explicit ask.
 - Team/group folders are listed with `inFolder` = `group:<GroupEmailFolder id>`
   (`email folder <name>`); their unread counts are keyed `group:<id>`. Replying to a
   group-folder email sends from that mailbox by default; fresh sends from the group
-  address land in the user's Sent view, not the folder.
+  address land in the user's Sent view, not the folder, and the folder listing hides
+  the user's own sent replies (server rule) - point agents at `email sent`/`thread`.
 - `email send|reply|draft --dry-run` resolves everything and prints the payload
   without uploading or sending - use it for live verification of derived fields.
 - `GET /Email/{id}` marks read. Email lists have counting disabled (`total` -1/-2).
