@@ -1,0 +1,53 @@
+{
+  "name": "espocrm-axi",
+  "version": "0.1.0",
+  "description": "AXI-compliant CLI for EspoCRM - records for every entity type, email inbox and sending with delivery verification, stream, activities, metadata, admin tools, and a raw REST escape hatch over the EspoCRM API.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Bryce Hamrick",
+  "keywords": [
+    "axi",
+    "espocrm",
+    "crm",
+    "cli",
+    "agent",
+    "email",
+    "toon"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brycehamrick/espocrm-axi.git"
+  },
+  "homepage": "https://github.com/brycehamrick/espocrm-axi#readme",
+  "bin": {
+    "espocrm-axi": "bin/espocrm-axi.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "skills",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "prepublishOnly": "npm run typecheck && npm run lint && npm test && npm run build"
+  },
+  "dependencies": {
+    "axi-sdk-js": "^0.1.14"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^3.0.0"
+  }
+}

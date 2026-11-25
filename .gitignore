@@ -1,0 +1,11 @@
+# Secrets - never commit. The CLI reads ESPO_CRM_* from the environment (or ./.env).
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+*.tgz
+
+# OS / editor
+.DS_Store
