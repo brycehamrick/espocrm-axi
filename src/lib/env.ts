@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { AxiError } from "axi-sdk-js";
 import { loadDotEnv } from "./dotenv.js";
 

@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { AxiError } from "axi-sdk-js";
 import type { AxiRenderable } from "../lib/output.js";
-import { renderResult, withHelp } from "../lib/output.js";
+import { withHelp } from "../lib/output.js";
 import { asRecord, asRecordArray, asString, compact, displayValue, type Json } from "../lib/coerce.js";
 import { forbidExtraPositionals, optionalInt, parseFlags, parseJsonFlag, requireConfirm, requirePositional, requireString, type FlagDefinition } from "../lib/args.js";
 import { requireAuth } from "../lib/auth.js";

@@ -1,7 +1,7 @@
 import { AxiError } from "axi-sdk-js";
 import type { CommandContext } from "../context.js";
 import { asString, displayValue, redactSecrets, type Json } from "./coerce.js";
-import { columnsFor, entityTypeArg, presetFor } from "./entities.js";
+import { entityTypeArg, presetFor } from "./entities.js";
 import { snippet } from "./truncate.js";
 import type { ListParams, WhereClause } from "./where.js";
 

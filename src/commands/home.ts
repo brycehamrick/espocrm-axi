@@ -1,6 +1,6 @@
 import type { AxiRenderable } from "../lib/output.js";
 import { asNumber, asRecord, asString, type Json } from "../lib/coerce.js";
-import { requireAuth, refreshedHint } from "../lib/auth.js";
+import { refreshedHint } from "../lib/auth.js";
 import type { CommandContext } from "../context.js";
 
 export const COMMAND_NAMES =

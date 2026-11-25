@@ -389,7 +389,7 @@ function buildCompose(values: FlagValues, commandPath: string, opts: { requireTo
   };
 }
 
-async function resolveFrom(ctx: CommandContext, from: string | undefined, commandPath: string): Promise<string> {
+async function resolveFrom(ctx: CommandContext, from: string | undefined): Promise<string> {
   if (from) return normalizeAddress(from);
   const me = asRecord(await ctx.client.request("GET", "App/user"));
   const address = asString(asRecord(me?.["user"])?.["emailAddress"]);
@@ -448,7 +448,7 @@ interface DeliverOptions {
 
 /** Create the Email record (uploading attachments first) and verify transmission when sending. */
 async function deliver(ctx: CommandContext, compose: Compose, opts: DeliverOptions): Promise<AxiRenderable> {
-  const from = await resolveFrom(ctx, compose.from, opts.commandPath);
+  const from = await resolveFrom(ctx, compose.from);
   const attachments: string[] = [...compose.attachIds];
   for (const path of compose.attachPaths) {
     const file = readUploadFile(path, opts.commandPath);

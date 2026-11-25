@@ -367,7 +367,7 @@ function buildCompose(values, commandPath, opts) {
         json: values["json"] === true,
     };
 }
-async function resolveFrom(ctx, from, commandPath) {
+async function resolveFrom(ctx, from) {
     if (from)
         return normalizeAddress(from);
     const me = asRecord(await ctx.client.request("GET", "App/user"));
@@ -415,7 +415,7 @@ async function emailDraft(args, ctx) {
 }
 /** Create the Email record (uploading attachments first) and verify transmission when sending. */
 async function deliver(ctx, compose, opts) {
-    const from = await resolveFrom(ctx, compose.from, opts.commandPath);
+    const from = await resolveFrom(ctx, compose.from);
     const attachments = [...compose.attachIds];
     for (const path of compose.attachPaths) {
         const file = readUploadFile(path, opts.commandPath);

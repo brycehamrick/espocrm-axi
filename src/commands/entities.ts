@@ -1,7 +1,7 @@
 import { AxiError } from "axi-sdk-js";
 import type { AxiRenderable } from "../lib/output.js";
 import { withHelp } from "../lib/output.js";
-import { asRecord, asString, compact, type Json } from "../lib/coerce.js";
+import { asRecord, asString, compact } from "../lib/coerce.js";
 import { forbidExtraPositionals, parseFlags, requireConfirm, requirePositional, requireString, type FlagDefinition } from "../lib/args.js";
 import { requireAuth } from "../lib/auth.js";
 import { validId } from "../lib/records.js";
