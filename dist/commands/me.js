@@ -71,7 +71,8 @@ export async function meCommand(args, ctx) {
             if (p["delete"])
                 scopes["delete"].push(scope);
         }
-        out["access"] = Object.fromEntries(Object.entries(scopes).map(([k, v]) => [k, v.join(", ")]));
+        const same = scopes["read"].join("|") === scopes["create"].join("|") && scopes["read"].join("|") === scopes["edit"].join("|") && scopes["read"].join("|") === scopes["delete"].join("|");
+        out["access"] = same ? `read, create, edit, delete: ${scopes["read"].join(", ")}` : Object.fromEntries(Object.entries(scopes).map(([k, v]) => [k, v.join(", ")]));
     }
     out["help"] = [
         "Run `espocrm-axi email inbox` to read mail" + (ctx.config.authMode === "basic" ? "" : " (needs a user token: ESPO_CRM_AUTH_USER)"),

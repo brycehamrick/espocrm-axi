@@ -6,6 +6,7 @@ import { activitiesCommand } from "../src/commands/activities.js";
 import { settingsCommand, metadataCommand, adminCommand, pipelinesCommand, notificationCommand } from "../src/commands/tools.js";
 import { massCommand, exportCommand } from "../src/commands/mass.js";
 import { shortcutCommand } from "../src/commands/entities.js";
+import { meCommand } from "../src/commands/me.js";
 import { ERR, OK, OK_LIST, contextFor, lastUrl, type Recorded } from "./helpers.js";
 import type { Json } from "../src/lib/coerce.js";
 
@@ -195,6 +196,25 @@ describe("export", () => {
     expect(readFileSync(resolve(dir, "out.csv"), "utf8")).toContain("Ada");
     expect(out).toMatchObject({ downloaded: { bytes: 14 } });
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("me access summary", () => {
+  it("collapses identical permission lists and keeps per-action lists when they differ", async () => {
+    const table = (read: boolean, write: boolean) => ({ Lead: { read, create: write, edit: write, delete: write }, Note: { read, create: write, edit: write, delete: write } });
+    const same = contextFor([OK({ user: { id: "u1", userName: "bot", type: "api" }, acl: { table: table(true, true) } })]).ctx;
+    expect(await meCommand([], same)).toMatchObject({ access: "read, create, edit, delete: Lead, Note" });
+    const varied = contextFor([OK({ user: { id: "u2", userName: "agent", type: "api" }, acl: { table: table(true, false) } })]).ctx;
+    const out = await meCommand([], varied);
+    expect(JSON.stringify(out)).toContain('"read":"Lead, Note"');
+    expect(JSON.stringify(out)).toContain('"create":""');
+  });
+
+  it("an API user without a token sees api-key mode and a pointer to basic auth for mail", async () => {
+    const { ctx } = contextFor([OK({ user: { id: "u3", userName: "bot", type: "api" }, token: null })], { ESPO_CRM_DOMAIN: "crm.example.test", ESPO_CRM_API_KEY: "k".repeat(32), ESPO_CRM_AUTH_MODE: "api-key" });
+    const out = await meCommand([], ctx);
+    expect(out).toMatchObject({ auth_mode: "api-key", user: { userName: "bot", type: "api" } });
+    expect(JSON.stringify(out)).toContain("ESPO_CRM_AUTH_USER");
   });
 });
 

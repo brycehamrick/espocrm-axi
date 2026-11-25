@@ -288,6 +288,7 @@ async function emailFolders(args: string[], ctx: CommandContext): Promise<AxiRen
     group_folders: group.list.map((f) => compact({ id: asString(f["id"]), name: asString(f["name"]), unread: unread[`group:${asString(f["id"]) ?? ""}`], filter: `group:${asString(f["id"]) ?? ""}` })),
   };
   if (personal.list.length === 0 && group.list.length === 0) out["result"] = "0 folders (only the built-in inbox/archive/trash)";
+  if (ctx.config.authMode !== "basic") out["note"] = "per-user folders and unread counts need a live user credential (ESPO_CRM_AUTH_MODE=basic); API users see only folders their role/team shares";
   return withHelp(out, ["Open one: `espocrm-axi email folder <name>` (e.g. `email folder Collabs --unread`)", "Move mail: `espocrm-axi email move <ids...> --folder <id>` (or `archive` / `group:<id>`)"], values["json"] === true);
 }
 
