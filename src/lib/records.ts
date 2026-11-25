@@ -1,6 +1,6 @@
 import { AxiError } from "axi-sdk-js";
 import type { CommandContext } from "../context.js";
-import { asString, displayValue, type Json } from "./coerce.js";
+import { asString, displayValue, redactSecrets, type Json } from "./coerce.js";
 import { columnsFor, entityTypeArg, presetFor } from "./entities.js";
 import { snippet } from "./truncate.js";
 import type { ListParams, WhereClause } from "./where.js";
@@ -72,7 +72,8 @@ export function breakdown(rows: Json[], field: string): string | undefined {
  * objects with varying keys.
  */
 export function projectRows(rows: Json[], columns: string[], full: boolean): Json[] {
-  return rows.map((row) => {
+  return rows.map((rawRow) => {
+    const row = redactSecrets(rawRow);
     const out: Json = {};
     for (const col of columns) {
       const value = displayValue(row[col]);

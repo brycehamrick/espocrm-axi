@@ -1,6 +1,6 @@
 import { AxiError } from "axi-sdk-js";
 import { displayRecord, renderResult, withHelp } from "../lib/output.js";
-import { asRecord, asRecordArray, asString, compact, displayValue } from "../lib/coerce.js";
+import { asRecord, asRecordArray, asString, compact, displayValue, redactSecrets } from "../lib/coerce.js";
 import { forbidExtraPositionals, optionalInt, parseAssignments, parseFlags, parseJsonFlag, requireConfirm, requirePositional, splitCsv } from "../lib/args.js";
 import { requireAuth } from "../lib/auth.js";
 import { LIST_FLAGS, MAX_LIMIT, parseListFlags } from "../lib/params.js";
@@ -100,7 +100,7 @@ export async function recordCommand(args, ctx) {
         case undefined:
         case "--help":
         case "help":
-            return { help_text: RECORD_HELP };
+            return RECORD_HELP;
         default:
             throw new AxiError(`unknown record subcommand: ${sub}`, "VALIDATION_ERROR", [
                 "Run `espocrm-axi record --help` for types, fields, links, list, get, count, create, update, delete, link, unlink, related, stream, follow, star",
@@ -197,7 +197,7 @@ async function recordList(args, ctx) {
         },
     });
     if (parsed.json)
-        return JSON.stringify({ total: outcome.total, list: outcome.rows }, null, 2);
+        return JSON.stringify({ total: outcome.total, list: outcome.rows.map(redactSecrets) }, null, 2);
     return out;
 }
 async function recordGet(args, ctx) {
@@ -212,7 +212,7 @@ async function recordGet(args, ctx) {
     if (!record)
         throw new AxiError(`${type} ${id} returned no data`, "NOT_FOUND");
     if (values["json"] === true)
-        return JSON.stringify(record, null, 2);
+        return JSON.stringify(redactSecrets(record), null, 2);
     const full = values["full"] === true;
     let shown = displayRecord(record, 400, full);
     if (fields.length > 0) {
@@ -311,7 +311,7 @@ async function recordUpdate(args, ctx) {
     }
     await applyAssignment(ctx, values, attributes, commandPath);
     requireConfirm(values, commandPath, `update ${type} ${id} with ${preview(attributes)}`);
-    const record = asRecord(await ctx.client.request("PUT", `${type}/${encodeURIComponent(id)}`, { body: attributes }));
+    const record = redactSecrets(asRecord(await ctx.client.request("PUT", `${type}/${encodeURIComponent(id)}`, { body: attributes })) ?? {});
     return mutationResult("updated", type, record, values["json"] === true, [
         `Run \`espocrm-axi record get ${type} ${id}\` to verify`,
     ]);

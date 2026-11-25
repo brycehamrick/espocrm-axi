@@ -26,7 +26,6 @@
     "bin",
     "dist",
     "skills",
-    "docs",
     "README.md",
     "LICENSE"
   ],
@@ -36,9 +35,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run build",
     "test": "vitest run",
-    "lint": "eslint .",
-    "prepublishOnly": "npm run typecheck && npm run lint && npm test && npm run build"
+    "secrets:check": "node scripts/scan-secrets.mjs",
+    "skill:check": "node scripts/check-skill.mjs",
+    "check": "npm run typecheck && npm run secrets:check && npm test && npm run skill:check",
+    "prepublishOnly": "npm run check"
   },
   "dependencies": {
     "axi-sdk-js": "^0.1.14"

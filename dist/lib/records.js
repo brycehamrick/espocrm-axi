@@ -1,5 +1,5 @@
 import { AxiError } from "axi-sdk-js";
-import { asString, displayValue } from "./coerce.js";
+import { asString, displayValue, redactSecrets } from "./coerce.js";
 import { entityTypeArg } from "./entities.js";
 import { snippet } from "./truncate.js";
 /**
@@ -50,7 +50,8 @@ export function breakdown(rows, field) {
  * objects with varying keys.
  */
 export function projectRows(rows, columns, full) {
-    return rows.map((row) => {
+    return rows.map((rawRow) => {
+        const row = redactSecrets(rawRow);
         const out = {};
         for (const col of columns) {
             const value = displayValue(row[col]);

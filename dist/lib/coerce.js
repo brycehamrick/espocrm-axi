@@ -66,3 +66,15 @@ export function displayValue(value) {
     }
     return JSON.stringify(value);
 }
+const SECRET_KEY_RE = /^(api[-_]?key|.*password|.*secret|.*token|.*privatekey|secretkey)$/i;
+/**
+ * Mask values of secret-looking attribute names (User.apiKey, EmailAccount.smtpPassword,
+ * Webhook.secret, ...). Server responses can carry them; transcripts never should.
+ */
+export function redactSecrets(record) {
+    const out = {};
+    for (const [key, value] of Object.entries(record)) {
+        out[key] = SECRET_KEY_RE.test(key) && value !== null && value !== false && value !== "" && value !== undefined ? "<redacted>" : value;
+    }
+    return out;
+}

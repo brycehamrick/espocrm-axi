@@ -37,7 +37,7 @@ const REFRESH_FLAGS: Record<string, FlagDefinition> = {
 
 export async function authCommand(args: string[], ctx: CommandContext): Promise<AxiRenderable> {
   const sub = args[0];
-  if (sub !== "status" && sub !== "refresh") return { help_text: AUTH_HELP };
+  if (sub !== "status" && sub !== "refresh") return AUTH_HELP;
   const commandPath = `espocrm-axi auth ${sub}`;
   requireAuth(ctx, commandPath);
 

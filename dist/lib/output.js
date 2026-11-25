@@ -2,7 +2,7 @@
  * Output helpers shared by commands: the --json escape hatch and definitive
  * empty states (AXI principles 1 and 5).
  */
-import { compact } from "./coerce.js";
+import { compact, redactSecrets } from "./coerce.js";
 export function renderResult(output, json) {
     if (json)
         return JSON.stringify(output, null, 2);
@@ -16,7 +16,7 @@ export function withHelp(output, help, json) {
 /** Convert a raw payload for display: drop empty containers, stringify nested values. */
 export function displayRecord(record, limit, full) {
     const out = {};
-    for (const [key, value] of Object.entries(record)) {
+    for (const [key, value] of Object.entries(redactSecrets(record))) {
         const shown = display(key, value, limit, full);
         if (shown !== undefined)
             out[key] = shown;

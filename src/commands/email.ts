@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { AxiError } from "axi-sdk-js";
 import type { AxiRenderable } from "../lib/output.js";
 import { displayRecord, renderResult, withHelp } from "../lib/output.js";
-import { asRecord, asRecordArray, asString, compact, type Json } from "../lib/coerce.js";
+import { asRecord, asRecordArray, asString, compact, redactSecrets, type Json } from "../lib/coerce.js";
 import { forbidExtraPositionals, optionalInt, parseFlags, requireConfirm, requirePositional, requireString, splitCsv, stringList, type FlagDefinition, type FlagValues } from "../lib/args.js";
 import { requireAuth } from "../lib/auth.js";
 import { LIST_FLAGS, parseListFlags } from "../lib/params.js";
@@ -116,7 +116,7 @@ const POLL_INTERVAL_MS = 3_000;
 export async function emailCommand(args: string[], ctx: CommandContext): Promise<AxiRenderable> {
   const sub = args[0];
   const rest = args.slice(1);
-  if (sub === undefined || sub === "--help" || sub === "help") return { help_text: EMAIL_HELP };
+  if (sub === undefined || sub === "--help" || sub === "help") return EMAIL_HELP;
   // `archive`/`important`/`trash` are both folder views (no ids) and actions (with ids).
   const hasIds = rest.some((a) => !a.startsWith("-"));
   if ((EMAIL_FOLDERS as readonly string[]).includes(sub) && !(hasIds && (sub === "archive" || sub === "important" || sub === "trash"))) {
@@ -305,7 +305,7 @@ async function emailFolderManage(args: string[], ctx: CommandContext): Promise<A
     await ctx.client.request("DELETE", `EmailFolder/${encodeURIComponent(id)}`);
     return renderResult({ deleted: { id } }, false);
   }
-  return { help_text: "email folder create --name <name> --confirm\nemail folder delete <id> --confirm" };
+  return "espocrm-axi email folder - personal folders\n\n  email folder create --name <name> --confirm\n  email folder delete <id> --confirm";
 }
 
 async function emailCount(args: string[], ctx: CommandContext): Promise<AxiRenderable> {
@@ -628,15 +628,6 @@ async function emailMove(args: string[], ctx: CommandContext): Promise<AxiRender
 
 // ---------- accounts & templates ----------
 
-const SECRET_KEY_RE = /password|secret|token|apikey/i;
-
-function redactSecrets(record: Json): Json {
-  const out: Json = {};
-  for (const [key, value] of Object.entries(record)) {
-    out[key] = SECRET_KEY_RE.test(key) && value !== null && value !== false && value !== "" ? "<redacted>" : value;
-  }
-  return out;
-}
 
 async function recordListRedacted(args: string[], ctx: CommandContext, type: string, label: string): Promise<AxiRenderable> {
   const commandPath = `espocrm-axi email ${type === "EmailAccount" ? "accounts" : type === "InboundEmail" ? "inbound" : "templates"}`;

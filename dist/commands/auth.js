@@ -33,7 +33,7 @@ const REFRESH_FLAGS = {
 export async function authCommand(args, ctx) {
     const sub = args[0];
     if (sub !== "status" && sub !== "refresh")
-        return { help_text: AUTH_HELP };
+        return AUTH_HELP;
     const commandPath = `espocrm-axi auth ${sub}`;
     requireAuth(ctx, commandPath);
     if (sub === "status") {

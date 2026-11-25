@@ -47,7 +47,8 @@ export const SHORTCUTS: Record<string, Shortcut> = {
   product: { type: "Product", label: "Products (Sales Pack)", filters: { type: "type" }, commonFields: ["name", "type", "code", "unitPrice", "isActive", "taxRate", "teamsIds"] },
 };
 
-function helpFor(name: string, s: Shortcut): string {
+export function shortcutHelp(name: string): string {
+  const s = SHORTCUTS[name]!;
   const filters = Object.entries(s.filters)
     .map(([flag, target]) => `--${flag} <${typeof target === "string" ? target : target.attribute}>`)
     .join("  ");
@@ -72,7 +73,7 @@ export function shortcutCommand(name: string): (args: string[], ctx: CommandCont
   const s = SHORTCUTS[name]!;
   return async (args: string[], ctx: CommandContext) => {
     const sub = args[0];
-    if (sub === undefined || sub === "--help" || sub === "help") return { help_text: helpFor(name, s) };
+    if (sub === undefined || sub === "--help" || sub === "help") return shortcutHelp(name);
     if (name === "lead" && (sub === "convert" || sub === "action/convert")) return leadConvert(args.slice(1), ctx);
     const translated = await translateFilters(s, args.slice(1), ctx);
     return recordCommand([sub, s.type, ...translated], ctx);

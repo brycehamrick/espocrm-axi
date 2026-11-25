@@ -1,21 +1,19 @@
 import { runAxiCli } from "axi-sdk-js";
 import { VERSION } from "./version.js";
 import { createCommandContext } from "./context.js";
+import { COMMAND_HELP, COMMAND_NAMES } from "./command-help.js";
 import { homeCommand } from "./commands/home.js";
-import { meCommand, ME_HELP } from "./commands/me.js";
-import { authCommand, AUTH_HELP } from "./commands/auth.js";
-import { recordCommand, RECORD_HELP } from "./commands/record.js";
+import { meCommand } from "./commands/me.js";
+import { authCommand } from "./commands/auth.js";
+import { recordCommand } from "./commands/record.js";
 import { shortcutCommand, SHORTCUTS } from "./commands/entities.js";
-import { emailCommand, EMAIL_HELP } from "./commands/email.js";
+import { emailCommand } from "./commands/email.js";
+import { streamCommand, postCommand } from "./commands/stream.js";
+import { searchCommand } from "./commands/search.js";
+import { attachmentCommand } from "./commands/attachment.js";
+import { apiCommand } from "./commands/api.js";
+import { setupCommand } from "./commands/setup.js";
 export const DESCRIPTION = "EspoCRM for agents - records for any entity type, inbox and email sending, stream, activities, admin tools over the EspoCRM REST API";
-const COMMAND_HELP = {
-    me: ME_HELP,
-    auth: AUTH_HELP,
-    record: RECORD_HELP,
-    email: EMAIL_HELP,
-    ...Object.fromEntries(Object.entries(SHORTCUTS).map(([name, s]) => [name, `espocrm-axi ${name} - ${s.label} (shortcut for \`record ... ${s.type}\`)\n\nRun \`espocrm-axi record --help\` for all subcommands and list flags.`])),
-};
-const COMMAND_NAMES = ["me", "auth", "record", "email", ...Object.keys(SHORTCUTS)];
 const TOP_LEVEL_HELP = `espocrm-axi - ${DESCRIPTION}
 
 commands:
@@ -36,6 +34,12 @@ const commands = {
     auth: bind(authCommand),
     record: bind(recordCommand),
     email: bind(emailCommand),
+    stream: bind(streamCommand),
+    post: bind(postCommand),
+    search: bind(searchCommand),
+    attachment: bind(attachmentCommand),
+    api: bind(apiCommand),
+    setup: ((args) => setupCommand(args)),
     ...Object.fromEntries(Object.entries(SHORTCUTS).map(([name]) => [name, bind(shortcutCommand(name))])),
 };
 export async function main() {

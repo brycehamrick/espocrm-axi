@@ -27,7 +27,8 @@ export const SHORTCUTS = {
     webhook: { type: "Webhook", label: "Webhooks (admin)", filters: { event: "event" }, commonFields: ["name", "event", "url", "isActive", "secret"] },
     product: { type: "Product", label: "Products (Sales Pack)", filters: { type: "type" }, commonFields: ["name", "type", "code", "unitPrice", "isActive", "taxRate", "teamsIds"] },
 };
-function helpFor(name, s) {
+export function shortcutHelp(name) {
+    const s = SHORTCUTS[name];
     const filters = Object.entries(s.filters)
         .map(([flag, target]) => `--${flag} <${typeof target === "string" ? target : target.attribute}>`)
         .join("  ");
@@ -52,7 +53,7 @@ export function shortcutCommand(name) {
     return async (args, ctx) => {
         const sub = args[0];
         if (sub === undefined || sub === "--help" || sub === "help")
-            return { help_text: helpFor(name, s) };
+            return shortcutHelp(name);
         if (name === "lead" && (sub === "convert" || sub === "action/convert"))
             return leadConvert(args.slice(1), ctx);
         const translated = await translateFilters(s, args.slice(1), ctx);

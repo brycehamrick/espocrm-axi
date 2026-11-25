@@ -2,7 +2,7 @@
  * Output helpers shared by commands: the --json escape hatch and definitive
  * empty states (AXI principles 1 and 5).
  */
-import { compact, type Json } from "./coerce.js";
+import { compact, redactSecrets, type Json } from "./coerce.js";
 
 /** Mirrors axi-sdk-js's renderable contract: TOON object or passthrough string. */
 export type AxiRenderable = string | Json;
@@ -20,7 +20,7 @@ export function withHelp(output: Json, help: string[], json: boolean | undefined
 /** Convert a raw payload for display: drop empty containers, stringify nested values. */
 export function displayRecord(record: Json, limit: number, full: boolean): Json {
   const out: Json = {};
-  for (const [key, value] of Object.entries(record)) {
+  for (const [key, value] of Object.entries(redactSecrets(record))) {
     const shown = display(key, value, limit, full);
     if (shown !== undefined) out[key] = shown;
   }

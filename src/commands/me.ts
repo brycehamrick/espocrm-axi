@@ -20,7 +20,7 @@ const ME_FLAGS: Record<string, FlagDefinition> = { full: { type: "boolean" }, js
 
 export async function meCommand(args: string[], ctx: CommandContext): Promise<AxiRenderable> {
   const sub = args[0];
-  if (sub === "--help" || sub === "help") return { help_text: ME_HELP };
+  if (sub === "--help" || sub === "help") return ME_HELP;
   const commandPath = "espocrm-axi me";
   const { values } = parseFlags(sub === "preferences" ? args.slice(1) : args, commandPath, ME_FLAGS);
   requireAuth(ctx, commandPath);

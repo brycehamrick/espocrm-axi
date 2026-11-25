@@ -16,7 +16,7 @@ const ME_FLAGS = { full: { type: "boolean" }, json: { type: "boolean" } };
 export async function meCommand(args, ctx) {
     const sub = args[0];
     if (sub === "--help" || sub === "help")
-        return { help_text: ME_HELP };
+        return ME_HELP;
     const commandPath = "espocrm-axi me";
     const { values } = parseFlags(sub === "preferences" ? args.slice(1) : args, commandPath, ME_FLAGS);
     requireAuth(ctx, commandPath);

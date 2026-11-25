@@ -42,7 +42,7 @@ export async function uploadAttachment(ctx, file, target, timeoutMs) {
         body: {
             name: file.name,
             type: file.type,
-            role: "Attachment",
+            role: target.role ?? "Attachment",
             field: target.field,
             ...(target.parentType ? { parentType: target.parentType } : {}),
             ...(target.relatedType ? { relatedType: target.relatedType } : {}),

@@ -50,7 +50,7 @@ export function readUploadFile(path: string, commandPath: string): { name: strin
 export async function uploadAttachment(
   ctx: CommandContext,
   file: { name: string; type: string; bytes: Buffer },
-  target: { field: string; parentType?: string; relatedType?: string; relatedId?: string },
+  target: { field: string; role?: string; parentType?: string; parentId?: string; relatedType?: string; relatedId?: string },
   timeoutMs?: number,
 ): Promise<UploadedAttachment> {
   const record = asRecord(await ctx.client.request("POST", "Attachment", {
@@ -58,7 +58,7 @@ export async function uploadAttachment(
     body: {
       name: file.name,
       type: file.type,
-      role: "Attachment",
+      role: target.role ?? "Attachment",
       field: target.field,
       ...(target.parentType ? { parentType: target.parentType } : {}),
       ...(target.relatedType ? { relatedType: target.relatedType } : {}),

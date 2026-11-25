@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { AxiError } from "axi-sdk-js";
 import { displayRecord, renderResult, withHelp } from "../lib/output.js";
-import { asRecord, asRecordArray, asString, compact } from "../lib/coerce.js";
+import { asRecord, asRecordArray, asString, compact, redactSecrets } from "../lib/coerce.js";
 import { forbidExtraPositionals, optionalInt, parseFlags, requireConfirm, requirePositional, requireString, splitCsv, stringList } from "../lib/args.js";
 import { requireAuth } from "../lib/auth.js";
 import { LIST_FLAGS, parseListFlags } from "../lib/params.js";
@@ -105,7 +105,7 @@ export async function emailCommand(args, ctx) {
     const sub = args[0];
     const rest = args.slice(1);
     if (sub === undefined || sub === "--help" || sub === "help")
-        return { help_text: EMAIL_HELP };
+        return EMAIL_HELP;
     // `archive`/`important`/`trash` are both folder views (no ids) and actions (with ids).
     const hasIds = rest.some((a) => !a.startsWith("-"));
     if (EMAIL_FOLDERS.includes(sub) && !(hasIds && (sub === "archive" || sub === "important" || sub === "trash"))) {
@@ -303,7 +303,7 @@ async function emailFolderManage(args, ctx) {
         await ctx.client.request("DELETE", `EmailFolder/${encodeURIComponent(id)}`);
         return renderResult({ deleted: { id } }, false);
     }
-    return { help_text: "email folder create --name <name> --confirm\nemail folder delete <id> --confirm" };
+    return "espocrm-axi email folder - personal folders\n\n  email folder create --name <name> --confirm\n  email folder delete <id> --confirm";
 }
 async function emailCount(args, ctx) {
     const commandPath = "espocrm-axi email count";
@@ -594,14 +594,6 @@ async function emailMove(args, ctx) {
     return withHelp({ moved: { count: ids.length, ids, folder } }, ["Run `espocrm-axi email folders` for folder ids"], values["json"] === true);
 }
 // ---------- accounts & templates ----------
-const SECRET_KEY_RE = /password|secret|token|apikey/i;
-function redactSecrets(record) {
-    const out = {};
-    for (const [key, value] of Object.entries(record)) {
-        out[key] = SECRET_KEY_RE.test(key) && value !== null && value !== false && value !== "" ? "<redacted>" : value;
-    }
-    return out;
-}
 async function recordListRedacted(args, ctx, type, label) {
     const commandPath = `espocrm-axi email ${type === "EmailAccount" ? "accounts" : type === "InboundEmail" ? "inbound" : "templates"}`;
     const { values } = parseFlags(args, commandPath, LIST_FLAGS);
