@@ -22,9 +22,12 @@ and `help[]` next steps with concrete ids on every result.
   `espocrm-axi job`, `espocrm-axi scheduled-job`, `espocrm-axi product`;
   `espocrm-axi lead convert <id> --confirm`.
 - Read mail → `espocrm-axi email inbox --unread --since 2d`, `email sent|archive|drafts|important|trash|all`,
+  a team/group inbox by name → `espocrm-axi email folder Collabs --unread`,
   `espocrm-axi email get <id>`, `espocrm-axi email thread <id>`, `espocrm-axi email folders`.
-- Send mail → `espocrm-axi email send --to a@b.com --subject "..." --text "..." --confirm` (or `--html`),
-  `espocrm-axi email reply <id> --text "..." --confirm` (threads via In-Reply-To),
+- Send mail → `espocrm-axi email send --to a@b.com --subject "..." --text "..." --confirm` (or `--html`);
+  send as a shared team mailbox with `--from collabs@example.com`; add `--dry-run` to print the
+  payload without sending. `espocrm-axi email reply <id> --text "..." --confirm` threads via
+  In-Reply-To and, inside a team folder, sends from that mailbox by default.
   `email draft`, `email send <draftId>`, `email schedule <draftId> --at "..."`.
   Delivery is verified: `delivered: true` only once EspoCRM stamps `dateSent`.
 - Mailbox state → `espocrm-axi email read|unread|important|archive|trash|move <ids...>`.
@@ -46,11 +49,12 @@ and `help[]` next steps with concrete ids on every result.
 ## Auth
 
 Environment variables only (or a `./.env`): `ESPO_CRM_DOMAIN` (hostname or URL) and
-`ESPO_CRM_API_KEY`. With `ESPO_CRM_USERNAME` set the key is treated as that user's
-auth token (Basic auth) - this is the only mode with per-user inbox access. Without it
-the key is sent as `X-Api-Key` (an API User from Administration > API Users).
-`ESPO_CRM_PASSWORD` lets an expired user token be re-bootstrapped automatically
-(tokens expire after ~48h idle). Never print the key; the CLI redacts it from errors.
+`ESPO_CRM_AUTH_MODE` to say which credential follows - `basic` for a live user
+(`ESPO_CRM_AUTH_USER` + `ESPO_CRM_AUTH_PASSWORD`; a token is bootstrapped per run, an
+optional `ESPO_CRM_API_KEY` stores one), or `api-key` for an API User key in
+`ESPO_CRM_API_KEY`. Basic mode is the only one with inbox/team-folder access and the
+one to use for sending; API users have no inbox. Never print credentials; the CLI
+redacts them from errors and masks apiKey/password/token fields in output.
 
 ## Invocation
 
@@ -71,6 +75,8 @@ A global install (`npm i -g espocrm-axi`) is only needed for `setup hooks`.
 - Every mutation needs `--confirm` and is gated before any network call; the gate error
   previews what would happen. Per-user mailbox flags (read/important/archive/trash) are
   reversible and ungated.
-- `email get` marks the message read; use `email inbox` to browse without side effects.
-  Never create an Email with `status=Sent` directly - it is never transmitted.
+- `email get` marks the message read; use `email inbox` / `email folder <name>` to browse
+  without side effects. Never create an Email with `status=Sent` directly - it is never
+  transmitted. A fresh send from a team mailbox appears in your Sent view; only replies
+  to team-folder mail stay in that folder.
 - Secret-named fields (apiKey, password, token) are masked in all output, including `--json`.

@@ -6,8 +6,9 @@ import { createCommandContext, type CommandContext } from "../src/context.js";
 export const TEST_ENV: NodeJS.ProcessEnv = {
   ESPO_CRM_DOMAIN: "crm.example.test",
   ESPO_CRM_API_KEY: "k".repeat(32),
-  ESPO_CRM_USERNAME: "ada",
-  ESPO_CRM_PASSWORD: "pw-secret-123",
+  ESPO_CRM_AUTH_MODE: "basic",
+  ESPO_CRM_AUTH_USER: "ada",
+  ESPO_CRM_AUTH_PASSWORD: "pw-secret-123",
 };
 
 export const TEST_CONFIG: EspoConfig = resolveConfig(TEST_ENV);

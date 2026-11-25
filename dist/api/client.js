@@ -29,19 +29,22 @@ export function createEspoClient(config, deps = {}) {
         return `${config.domain}/api/v1/`;
     };
     function authHeaders(method, pathname) {
-        if (!config.apiKey) {
+        if (!config.apiKey && config.authMode !== "basic") {
             throw new AxiError("ESPO_CRM_API_KEY is not set", "AUTH_REQUIRED", [
                 "Create an API User under Administration > API Users and export its key as ESPO_CRM_API_KEY",
-                "Or use a regular user's auth token with ESPO_CRM_USERNAME=<user> for per-user inbox access",
+                "Or use a live user credential: ESPO_CRM_AUTH_MODE=basic ESPO_CRM_AUTH_USER=<user> ESPO_CRM_AUTH_PASSWORD=<password>",
             ]);
         }
         if (config.authMode === "basic") {
             if (!config.username) {
-                throw new AxiError("basic auth requires ESPO_CRM_USERNAME", "VALIDATION_ERROR", [
-                    "Set ESPO_CRM_USERNAME to the user the token belongs to, or ESPO_CRM_AUTH_MODE=api-key",
+                throw new AxiError("basic auth requires ESPO_CRM_AUTH_USER", "VALIDATION_ERROR", [
+                    "Set ESPO_CRM_AUTH_USER to the user the token belongs to, or ESPO_CRM_AUTH_MODE=api-key",
                 ]);
             }
             const token = freshToken ?? config.apiKey;
+            if (!token) {
+                throw new AxiError("basic auth has no token: set ESPO_CRM_AUTH_PASSWORD (bootstraps one) or ESPO_CRM_API_KEY", "AUTH_REQUIRED");
+            }
             return { Authorization: `Basic ${Buffer.from(`${config.username}:${token}`).toString("base64")}` };
         }
         if (config.authMode === "hmac") {
@@ -54,13 +57,19 @@ export function createEspoClient(config, deps = {}) {
             const digest = createHmac("sha256", config.secretKey).update(`${method.toUpperCase()} ${resource}`).digest("hex");
             return { "X-Hmac-Authorization": Buffer.from(`${config.apiKey}:${digest}`).toString("base64") };
         }
+        if (!config.apiKey) {
+            throw new AxiError("ESPO_CRM_API_KEY is not set", "AUTH_REQUIRED", [
+                "API User key: export ESPO_CRM_API_KEY=<key> (Administration > API Users)",
+                "Live user: export ESPO_CRM_AUTH_MODE=basic ESPO_CRM_AUTH_USER=<user> ESPO_CRM_AUTH_PASSWORD=<password>",
+            ]);
+        }
         return { "X-Api-Key": config.apiKey };
     }
     async function bootstrapToken() {
         if (!config.username || !config.password) {
-            throw new AxiError("EspoCRM rejected the user token and ESPO_CRM_PASSWORD is not set, so it cannot be refreshed", "AUTH_REQUIRED", [
-                "Export ESPO_CRM_PASSWORD so expired tokens can be re-bootstrapped automatically, or paste a fresh token into ESPO_CRM_API_KEY",
-                `Run \`${process.argv[1] ?? "espocrm-axi"} auth refresh --write-env\` once ESPO_CRM_PASSWORD is set`,
+            throw new AxiError("EspoCRM rejected the user token and ESPO_CRM_AUTH_PASSWORD is not set, so it cannot be refreshed", "AUTH_REQUIRED", [
+                "Export ESPO_CRM_AUTH_PASSWORD so expired tokens can be re-bootstrapped automatically, or paste a fresh token into ESPO_CRM_API_KEY",
+                `Run \`${process.argv[1] ?? "espocrm-axi"} auth refresh --write-env\` once ESPO_CRM_AUTH_PASSWORD is set`,
             ]);
         }
         const url = `${base()}App/user`;
@@ -75,7 +84,7 @@ export function createEspoClient(config, deps = {}) {
         });
         const text = await response.text().catch(() => "");
         if (!response.ok) {
-            throw new AxiError(`EspoCRM token refresh failed (GET App/user -> HTTP ${response.status}): ${reasonOf(response, text)}`, "AUTH_REQUIRED", ["Check ESPO_CRM_USERNAME / ESPO_CRM_PASSWORD and that the account can log in"]);
+            throw new AxiError(`EspoCRM token refresh failed (GET App/user -> HTTP ${response.status}): ${reasonOf(response, text)}`, "AUTH_REQUIRED", ["Check ESPO_CRM_AUTH_USER / ESPO_CRM_AUTH_PASSWORD and that the account can log in"]);
         }
         const parsed = parseBody(text);
         const token = typeof parsed === "object" && parsed !== null ? parsed["token"] : undefined;
@@ -124,8 +133,8 @@ export function createEspoClient(config, deps = {}) {
         }
         if (status === 401) {
             return new AxiError(`EspoCRM rejected authentication (HTTP 401) for ${where}: ${reason}`, "AUTH_REQUIRED", [
-                `Auth mode is ${config.authMode}; verify ESPO_CRM_API_KEY${config.authMode === "basic" ? " and ESPO_CRM_USERNAME" : ""}`,
-                "If the key is a regular user's auth token it must be sent in basic mode (set ESPO_CRM_USERNAME)",
+                `Auth mode is ${config.authMode}; verify ESPO_CRM_API_KEY${config.authMode === "basic" ? " and ESPO_CRM_AUTH_USER" : ""}`,
+                "If the key is a regular user's auth token it must be sent in basic mode (set ESPO_CRM_AUTH_USER)",
                 "Repeated failures trigger a temporary lockout (403); wait a few minutes before retrying",
             ]);
         }
@@ -185,6 +194,12 @@ export function createEspoClient(config, deps = {}) {
             const encoded = encodeListParams(opts.list, style);
             for (const [key, value] of encoded.entries())
                 url.searchParams.set(key, value);
+        }
+        // basic mode with no stored token: bootstrap one from the password up front
+        if (!opts.noAuth && config.authMode === "basic" && !freshToken && !config.apiKey) {
+            freshToken = await bootstrapToken();
+            auth.refreshed = true;
+            bootstrapped = true;
         }
         const timeoutMs = opts.timeoutMs ?? config.timeoutMs;
         const headers = {

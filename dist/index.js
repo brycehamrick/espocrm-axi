@@ -25,7 +25,7 @@ ${COMMAND_NAMES.map((c) => `  ${c}`).join("\n")}
 global flags: --help, -v/--version, update (self-update)
 
 auth: ESPO_CRM_DOMAIN and ESPO_CRM_API_KEY env vars (or ./.env). With
-ESPO_CRM_USERNAME set, the key is treated as that user's auth token (Basic
+ESPO_CRM_AUTH_USER set, the key is treated as that user's auth token (Basic
 auth) - required for per-user inbox access. API Users use X-Api-Key.
 
 all writes require --confirm. run \`espocrm-axi <command> --help\` for details.`;

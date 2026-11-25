@@ -7,17 +7,21 @@ import { loadDotEnv } from "./dotenv.js";
  * is consulted as a convenience (without overriding real env vars), mirroring
  * how many EspoCRM automations already store `ESPO_CRM_*` values.
  *
- * Two variables are required for every data command:
- *   ESPO_CRM_DOMAIN   hostname or URL of the EspoCRM instance
- *   ESPO_CRM_API_KEY  the credential (an API User key, or a user auth token)
+ *   ESPO_CRM_DOMAIN        hostname or URL of the EspoCRM instance (required)
+ *   ESPO_CRM_AUTH_MODE     api-key | basic | hmac | auto (default auto)
  *
- * Auth modes (ESPO_CRM_AUTH_MODE = auto | api-key | basic | hmac):
- *   api-key  X-Api-Key header - API Users created under Administration > API Users.
- *   basic    Authorization: Basic base64(<user>:<token>) - a regular user's
- *            auth token. Requires ESPO_CRM_USERNAME. This is the only mode with
- *            per-user inbox access (inbox/archive/read state lives in email_user).
- *   hmac     X-Hmac-Authorization - API User with HMAC auth + ESPO_CRM_SECRET_KEY.
- *   auto     basic when ESPO_CRM_USERNAME is set, otherwise api-key.
+ * API User (X-Api-Key):
+ *   ESPO_CRM_API_KEY       the API User's key (Administration > API Users)
+ *
+ * Live user credential (basic - the only mode that can read a user's inbox,
+ * send from a user's addresses, and see per-user folder/read state):
+ *   ESPO_CRM_AUTH_USER     username
+ *   ESPO_CRM_AUTH_PASSWORD password - bootstraps a fresh auth token (48h idle
+ *                          expiry) whenever the stored one is missing or stale
+ *   ESPO_CRM_API_KEY       optional: a stored auth token; saves a bootstrap call
+ *
+ * ESPO_CRM_AUTH_USER / ESPO_CRM_AUTH_PASSWORD are accepted as aliases for the AUTH_
+ * names. auto resolves to basic when a username is present, else api-key.
  */
 
 export type AuthMode = "api-key" | "basic" | "hmac";
@@ -39,8 +43,8 @@ export interface EspoConfig {
 export const ENV_VARS = {
   domain: "ESPO_CRM_DOMAIN",
   apiKey: "ESPO_CRM_API_KEY",
-  username: "ESPO_CRM_USERNAME",
-  password: "ESPO_CRM_PASSWORD",
+  username: "ESPO_CRM_AUTH_USER",
+  password: "ESPO_CRM_AUTH_PASSWORD",
   secretKey: "ESPO_CRM_SECRET_KEY",
   authMode: "ESPO_CRM_AUTH_MODE",
   whereStyle: "ESPO_CRM_WHERE_STYLE",
@@ -48,12 +52,17 @@ export const ENV_VARS = {
   userAgent: "ESPO_CRM_USER_AGENT",
 } as const;
 
-/** Accepts hermes-style ESPO_CRM_AUTH_* names as aliases for the username/password. */
+/** ESPO_CRM_AUTH_USER / ESPO_CRM_AUTH_PASSWORD win; ESPO_CRM_AUTH_USER / ESPO_CRM_AUTH_PASSWORD work as aliases. */
 function envValue(env: NodeJS.ProcessEnv, name: string, alias?: string): string | undefined {
   const direct = env[name]?.trim();
   if (direct) return direct;
   const aliased = alias ? env[alias]?.trim() : undefined;
   return aliased || undefined;
+}
+
+export function hasCredential(config: EspoConfig): boolean {
+  if (config.apiKey) return true;
+  return config.authMode === "basic" && Boolean(config.password);
 }
 
 /**
@@ -151,8 +160,8 @@ function resolveTimeout(raw: string | undefined): number {
 export function resolveConfig(env: NodeJS.ProcessEnv = loadDotEnv(process.env)): EspoConfig {
   const rawDomain = envValue(env, ENV_VARS.domain);
   const apiKey = envValue(env, ENV_VARS.apiKey);
-  const username = envValue(env, ENV_VARS.username, "ESPO_CRM_AUTH_USER");
-  const password = envValue(env, ENV_VARS.password, "ESPO_CRM_AUTH_PASSWORD");
+  const username = envValue(env, ENV_VARS.username, "ESPO_CRM_USERNAME");
+  const password = envValue(env, ENV_VARS.password, "ESPO_CRM_PASSWORD");
 
   if (apiKey !== undefined && apiKey.length === 0) {
     throw new AxiError(`${ENV_VARS.apiKey} is set but empty`, "VALIDATION_ERROR", [

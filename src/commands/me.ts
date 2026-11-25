@@ -13,7 +13,7 @@ subcommands:
   me preferences        the user's preferences (locale, timezone, defaults...)
   me --full | --json    complete / raw payload
 
-auth: ESPO_CRM_DOMAIN + ESPO_CRM_API_KEY (+ ESPO_CRM_USERNAME for user tokens).
+auth: ESPO_CRM_DOMAIN + ESPO_CRM_API_KEY (+ ESPO_CRM_AUTH_USER for user tokens).
 In basic mode the response also carries a fresh auth token, which is redacted here.`;
 
 const ME_FLAGS: Record<string, FlagDefinition> = { full: { type: "boolean" }, json: { type: "boolean" } };
@@ -73,7 +73,7 @@ export async function meCommand(args: string[], ctx: CommandContext): Promise<Ax
     out["access"] = Object.fromEntries(Object.entries(scopes).map(([k, v]) => [k, v.join(", ")]));
   }
   out["help"] = [
-    "Run `espocrm-axi email inbox` to read mail" + (ctx.config.authMode === "basic" ? "" : " (needs a user token: ESPO_CRM_USERNAME)"),
+    "Run `espocrm-axi email inbox` to read mail" + (ctx.config.authMode === "basic" ? "" : " (needs a user token: ESPO_CRM_AUTH_USER)"),
     "Run `espocrm-axi record list <Type>` for any scope listed under access.read",
     "Run `espocrm-axi me --full` for the complete payload",
   ];

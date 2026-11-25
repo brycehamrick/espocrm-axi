@@ -3,21 +3,26 @@ import { loadDotEnv } from "./dotenv.js";
 export const ENV_VARS = {
     domain: "ESPO_CRM_DOMAIN",
     apiKey: "ESPO_CRM_API_KEY",
-    username: "ESPO_CRM_USERNAME",
-    password: "ESPO_CRM_PASSWORD",
+    username: "ESPO_CRM_AUTH_USER",
+    password: "ESPO_CRM_AUTH_PASSWORD",
     secretKey: "ESPO_CRM_SECRET_KEY",
     authMode: "ESPO_CRM_AUTH_MODE",
     whereStyle: "ESPO_CRM_WHERE_STYLE",
     timeout: "ESPO_CRM_TIMEOUT_MS",
     userAgent: "ESPO_CRM_USER_AGENT",
 };
-/** Accepts hermes-style ESPO_CRM_AUTH_* names as aliases for the username/password. */
+/** ESPO_CRM_AUTH_USER / ESPO_CRM_AUTH_PASSWORD win; ESPO_CRM_AUTH_USER / ESPO_CRM_AUTH_PASSWORD work as aliases. */
 function envValue(env, name, alias) {
     const direct = env[name]?.trim();
     if (direct)
         return direct;
     const aliased = alias ? env[alias]?.trim() : undefined;
     return aliased || undefined;
+}
+export function hasCredential(config) {
+    if (config.apiKey)
+        return true;
+    return config.authMode === "basic" && Boolean(config.password);
 }
 /**
  * Normalize an EspoCRM domain: bare hostnames get https://, trailing slashes
@@ -113,8 +118,8 @@ function resolveTimeout(raw) {
 export function resolveConfig(env = loadDotEnv(process.env)) {
     const rawDomain = envValue(env, ENV_VARS.domain);
     const apiKey = envValue(env, ENV_VARS.apiKey);
-    const username = envValue(env, ENV_VARS.username, "ESPO_CRM_AUTH_USER");
-    const password = envValue(env, ENV_VARS.password, "ESPO_CRM_AUTH_PASSWORD");
+    const username = envValue(env, ENV_VARS.username, "ESPO_CRM_USERNAME");
+    const password = envValue(env, ENV_VARS.password, "ESPO_CRM_PASSWORD");
     if (apiKey !== undefined && apiKey.length === 0) {
         throw new AxiError(`${ENV_VARS.apiKey} is set but empty`, "VALIDATION_ERROR", [
             "Export an API User key (Administration > API Users) or a user auth token",

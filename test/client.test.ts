@@ -19,9 +19,12 @@ describe("env", () => {
     expect(() => resolveConfig({ ...TEST_ENV, ESPO_CRM_DOMAIN: "https://user:pw@crm.example.com" })).toThrow(/credentials/);
   });
 
-  it("picks the auth mode automatically from the username and accepts hermes aliases", () => {
+  it("picks the auth mode automatically from the username and accepts both naming schemes", () => {
     expect(resolveConfig({ ESPO_CRM_DOMAIN: "a.test", ESPO_CRM_API_KEY: "k" }).authMode).toBe("api-key");
     expect(resolveConfig({ ESPO_CRM_DOMAIN: "a.test", ESPO_CRM_API_KEY: "k", ESPO_CRM_AUTH_USER: "ada" }).authMode).toBe("basic");
+    expect(resolveConfig({ ESPO_CRM_DOMAIN: "a.test", ESPO_CRM_API_KEY: "k", ESPO_CRM_USERNAME: "ada" }).authMode).toBe("basic");
+    expect(resolveConfig({ ESPO_CRM_DOMAIN: "a.test", ESPO_CRM_AUTH_MODE: "basic", ESPO_CRM_AUTH_USER: "ada", ESPO_CRM_AUTH_PASSWORD: "p" })).toMatchObject({ authMode: "basic", username: "ada", password: "p", apiKey: undefined });
+    expect(resolveConfig({ ESPO_CRM_DOMAIN: "a.test", ESPO_CRM_AUTH_MODE: "basic", ESPO_CRM_AUTH_USER: "ada", ESPO_CRM_PASSWORD: "p" }).password).toBe("p");
     expect(resolveConfig({ ESPO_CRM_DOMAIN: "a.test", ESPO_CRM_API_KEY: "k", ESPO_CRM_AUTH_MODE: "api-key", ESPO_CRM_AUTH_USER: "ada" }).authMode).toBe("api-key");
     expect(() => resolveConfig({ ESPO_CRM_DOMAIN: "a.test", ESPO_CRM_API_KEY: "k", ESPO_CRM_AUTH_MODE: "weird" })).toThrow(/AUTH_MODE must be one of/);
   });
@@ -69,8 +72,21 @@ describe("client auth", () => {
   });
 
   it("fails with AUTH_REQUIRED guidance when the token is stale and no password is set", async () => {
-    const { client } = clientFor([ERR(401)], { ESPO_CRM_DOMAIN: "crm.example.com", ESPO_CRM_API_KEY: "k", ESPO_CRM_USERNAME: "ada" });
-    await expect(client.request("GET", "Lead")).rejects.toMatchObject({ code: "AUTH_REQUIRED", message: expect.stringContaining("ESPO_CRM_PASSWORD") });
+    const { client } = clientFor([ERR(401)], { ESPO_CRM_DOMAIN: "crm.example.com", ESPO_CRM_API_KEY: "k", ESPO_CRM_AUTH_USER: "ada" });
+    await expect(client.request("GET", "Lead")).rejects.toMatchObject({ code: "AUTH_REQUIRED", message: expect.stringContaining("ESPO_CRM_AUTH_PASSWORD") });
+  });
+
+  it("bootstraps a token before the first request when basic mode has only user + password", async () => {
+    const { client, calls } = clientFor([OK({ token: "fresh-token" }), OK({ id: "1" })], { ESPO_CRM_DOMAIN: "crm.example.com", ESPO_CRM_AUTH_MODE: "basic", ESPO_CRM_AUTH_USER: "ada", ESPO_CRM_AUTH_PASSWORD: "pw" });
+    expect(await client.request("GET", "Lead/1")).toEqual({ id: "1" });
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.url).toBe("https://crm.example.com/api/v1/App/user");
+    expect(calls[0]!.headers["espo-authorization"]).toBe(Buffer.from("ada:pw").toString("base64"));
+    expect(calls[1]!.headers["authorization"]).toBe(`Basic ${Buffer.from("ada:fresh-token").toString("base64")}`);
+    expect(client.auth.refreshed).toBe(true);
+    // later requests reuse the bootstrapped token without another bootstrap
+    await client.request("GET", "Lead/2");
+    expect(calls).toHaveLength(3);
   });
 });
 

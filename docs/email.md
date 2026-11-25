@@ -52,6 +52,19 @@ base64 data URL, `relatedType: "Email"`, `field: "attachments"`), then reference
 - Unread counts come from `GET /Email/inbox/notReadCounts` (`inbox`, `drafts`,
   `group:<folderId>`); the CLI folds them into `email inbox` and `email folders`.
 
+## 2b. Team / group inboxes
+
+- A group mailbox (`InboundEmail`, e.g. `collabs@example.com`) delivers into a
+  `GroupEmailFolder` ("Collabs") tied to a team. Users on the team list it with
+  `inFolder` = `group:<folderId>` (`email folder Collabs`, or `group:` for all group
+  mail); unread counts arrive as `group:<folderId>` keys.
+- Sending **as** the team inbox is `--from collabs@example.com`: the server accepts it
+  when the group account is shared with you and has SMTP. A fresh send lands in your
+  Sent view (`groupFolderId` null). A **reply** to a group-folder message inherits the
+  group folder and, in this CLI, defaults `--from` to that mailbox.
+- `email send|reply --dry-run` prints the resolved payload (from/to/subject/parent/
+  repliedId) without uploading or sending.
+
 ## 3. Reading marks as read
 
 `GET /Email/{id}` runs a `MarkAsRead` before-read hook for the current user. There is

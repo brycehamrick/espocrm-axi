@@ -1,5 +1,5 @@
 import { asNumber, asRecord, asString } from "../lib/coerce.js";
-import { refreshedHint } from "../lib/auth.js";
+import { hasCredential, refreshedHint } from "../lib/auth.js";
 export const COMMAND_NAMES = "record lead contact account opportunity case task meeting call note campaign document user team email stream post activities search attachment export mass settings admin pipelines kanban notification auth api setup";
 async function count(ctx, type, where) {
     try {
@@ -19,14 +19,14 @@ async function count(ctx, type, where) {
  * a handful of cheap calls in parallel and degrade gracefully when one fails.
  */
 export async function homeCommand(_args, ctx) {
-    const configured = Boolean(ctx.config.domain && ctx.config.apiKey);
+    const configured = Boolean(ctx.config.domain && hasCredential(ctx.config));
     const out = { auth: configured ? ctx.config.authMode : "none" };
     if (!configured) {
-        out["setup"] = "export ESPO_CRM_DOMAIN=crm.example.com ESPO_CRM_API_KEY=... (Administration > API Users)";
+        out["setup"] = "export ESPO_CRM_DOMAIN=crm.example.com ESPO_CRM_AUTH_MODE=basic ESPO_CRM_AUTH_USER=<user> ESPO_CRM_AUTH_PASSWORD=<password>  (or ESPO_CRM_API_KEY=<API User key>)";
         out["commands"] = COMMAND_NAMES;
         out["help"] = [
             "Run `espocrm-axi --help` for the command list",
-            "Export ESPO_CRM_DOMAIN and ESPO_CRM_API_KEY to unlock live data",
+            "Export ESPO_CRM_DOMAIN plus a credential (API User key, or ESPO_CRM_AUTH_USER/PASSWORD) to unlock live data",
             "Run `espocrm-axi setup hooks` for ambient context in every session",
         ];
         return out;
@@ -68,7 +68,7 @@ export async function homeCommand(_args, ctx) {
         }
     }
     else {
-        out["inbox_unread"] = "n/a (api-key users have no inbox; use ESPO_CRM_USERNAME for per-user access)";
+        out["inbox_unread"] = "n/a (api-key users have no inbox; use ESPO_CRM_AUTH_MODE=basic with a user credential)";
     }
     out["commands"] = COMMAND_NAMES;
     out["help"] = [

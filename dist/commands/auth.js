@@ -10,14 +10,14 @@ export const AUTH_HELP = `espocrm-axi auth - verify credentials and refresh expi
 subcommands:
   auth status             which instance, mode, and user the credentials resolve to
   auth refresh [--write-env] [--env-file <path>]
-                          bootstrap a fresh user auth token from ESPO_CRM_PASSWORD.
+                          bootstrap a fresh user auth token from ESPO_CRM_AUTH_PASSWORD.
                           Without --write-env it only proves the refresh works;
                           with --write-env the new token replaces ESPO_CRM_API_KEY
                           in ./.env (or --env-file). The token is never printed.
 
 why: in basic mode ESPO_CRM_API_KEY is a user auth token that expires after
 authTokenMaxIdleTime (48h by default) without use. Every command already
-re-bootstraps a stale token in-process when ESPO_CRM_PASSWORD is set; use
+re-bootstraps a stale token in-process when ESPO_CRM_AUTH_PASSWORD is set; use
 auth refresh --write-env from cron to persist it for tools that read .env.
 
 examples:
@@ -54,11 +54,11 @@ export async function authCommand(args, ctx) {
     const { values } = parseFlags(args.slice(1), commandPath, REFRESH_FLAGS);
     if (ctx.config.authMode !== "basic") {
         throw new AxiError("auth refresh only applies to user tokens (ESPO_CRM_AUTH_MODE=basic); API keys do not expire", "VALIDATION_ERROR", [
-            "Set ESPO_CRM_USERNAME so the mode resolves to basic",
+            "Set ESPO_CRM_AUTH_USER so the mode resolves to basic",
         ]);
     }
     if (!ctx.config.password) {
-        throw new AxiError("auth refresh requires ESPO_CRM_PASSWORD", "VALIDATION_ERROR", [
+        throw new AxiError("auth refresh requires ESPO_CRM_AUTH_PASSWORD", "VALIDATION_ERROR", [
             "Export the account password (or ESPO_CRM_AUTH_PASSWORD) so a fresh token can be bootstrapped",
         ]);
     }
@@ -81,7 +81,7 @@ export async function authCommand(args, ctx) {
             writeFileSync(envFile, `${lines.join("\n").replace(/\n{3,}/g, "\n\n")}${before.endsWith("\n") ? "\n" : ""}`);
         }
         else {
-            writeFileSync(envFile, `ESPO_CRM_DOMAIN=${ctx.config.domain}\nESPO_CRM_USERNAME=${ctx.config.username ?? ""}\nESPO_CRM_API_KEY=${token}\n`);
+            writeFileSync(envFile, `ESPO_CRM_DOMAIN=${ctx.config.domain}\nESPO_CRM_AUTH_USER=${ctx.config.username ?? ""}\nESPO_CRM_API_KEY=${token}\n`);
         }
     }
     return renderResult(compact({
@@ -92,7 +92,7 @@ export async function authCommand(args, ctx) {
         stored: writeEnv ? envFile : false,
         help: [
             writeEnv ? "New sessions pick the token up from the env file automatically" : "Token was validated but not stored; rerun with --write-env to persist it",
-            "The token is never printed; rotate ESPO_CRM_PASSWORD if the env file is shared",
+            "The token is never printed; rotate ESPO_CRM_AUTH_PASSWORD if the env file is shared",
         ],
     }), false);
 }
@@ -107,7 +107,7 @@ async function bootstrap(ctx) {
     if (!response.ok) {
         const reason = response.headers.get("x-status-reason") ?? text.slice(0, 160) ?? "(no message)";
         throw new AxiError(`token bootstrap failed (HTTP ${response.status}): ${reason}`, "AUTH_REQUIRED", [
-            "Check ESPO_CRM_USERNAME / ESPO_CRM_PASSWORD",
+            "Check ESPO_CRM_AUTH_USER / ESPO_CRM_AUTH_PASSWORD",
         ]);
     }
     const token = asString(asRecord(JSON.parse(text))?.["token"]);
@@ -117,6 +117,6 @@ async function bootstrap(ctx) {
 }
 function refreshedHelp(ctx) {
     return ctx.config.authMode === "basic" && !ctx.config.password
-        ? ["Set ESPO_CRM_PASSWORD so expired tokens refresh automatically (48h idle expiry)"]
+        ? ["Set ESPO_CRM_AUTH_PASSWORD so expired tokens refresh automatically (48h idle expiry)"]
         : ["Run `espocrm-axi email inbox` or `espocrm-axi record list Lead` to start"];
 }

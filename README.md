@@ -44,21 +44,21 @@ Environment variables only (or a `./.env`; real env vars win):
 | Variable | Purpose |
 | --- | --- |
 | `ESPO_CRM_DOMAIN` | Hostname or URL of the instance (`crm.example.com`) |
-| `ESPO_CRM_API_KEY` | The credential (see below) |
-| `ESPO_CRM_USERNAME` | Optional. Treats the key as this **user's auth token** (`Authorization: Basic base64(user:token)`) |
-| `ESPO_CRM_PASSWORD` | Optional. Re-bootstraps an expired user token automatically |
-| `ESPO_CRM_AUTH_MODE` | `auto` (default) \| `api-key` \| `basic` \| `hmac` |
+| `ESPO_CRM_AUTH_MODE` | `api-key` \| `basic` \| `hmac` \| `auto` (default: basic when a username is set) |
+| `ESPO_CRM_API_KEY` | API User key (`X-Api-Key`), or an optional stored user token in basic mode |
+| `ESPO_CRM_AUTH_USER` / `ESPO_CRM_AUTH_PASSWORD` | Live user credential: bootstraps a token per run (`ESPO_CRM_USERNAME`/`ESPO_CRM_PASSWORD` work as aliases) |
 | `ESPO_CRM_SECRET_KEY` | For `hmac` (API User with HMAC auth) |
 | `ESPO_CRM_WHERE_STYLE` | `auto` \| `where` \| `whereGroup` (WAF workaround) |
 
-- **API User** (Administration > API Users, auth method *API Key*): set the two
-  required variables; the key is sent as `X-Api-Key`. Good for records, stream,
-  admin - but API users **have no inbox**.
-- **User token** (the way the CRM UI authenticates): set `ESPO_CRM_USERNAME` and put
-  the user's auth token in `ESPO_CRM_API_KEY`. This is the only mode with per-user
-  inbox, sent, drafts, read/archive state. Tokens expire after ~48h idle, so also
-  set `ESPO_CRM_PASSWORD` and the CLI refreshes them in-process
-  (`auth refresh --write-env` persists one).
+Two ways to authenticate - pick explicitly with `ESPO_CRM_AUTH_MODE`:
+
+- **`api-key`** - an API User (Administration > API Users, auth method *API Key*).
+  Good for records, stream, admin - but API users **have no inbox**.
+- **`basic`** - a live user credential (`ESPO_CRM_AUTH_USER` + `ESPO_CRM_AUTH_PASSWORD`),
+  the way the CRM UI authenticates. The CLI bootstraps a fresh token every run it
+  needs one (tokens expire after ~48h idle) and re-bootstraps on a stale stored
+  token. This is the only mode with inbox/team-folder access and per-user state,
+  and the one to use for sending. `auth refresh --write-env` persists a token.
 
 Keys are redacted from every error; `apiKey`/`password`/`token` attributes returned by
 the server are masked in all output, including `--json`.
@@ -90,9 +90,13 @@ Every command supports `--help`; data commands support `--json` and `--full`.
 espocrm-axi email inbox --unread --since 2d --limit 10
 espocrm-axi email get 6b06...
 
-# Send and verify; reply with threading
+# Send and verify; send as a shared team mailbox; reply with threading (dry-run first)
 espocrm-axi email send --to ada@example.com --subject "Welcome" --text "Hello Ada" --confirm
+espocrm-axi email send --from collabs@example.com --to ada@example.com --subject "Hi" --text "..." --dry-run
 espocrm-axi email reply 6b06... --text "Thanks, looping in Ada." --attach brief.pdf --confirm
+
+# Team / group inbox folder by name
+espocrm-axi email folder Collabs --unread --since 7d
 
 # Records: generic engine + filters
 espocrm-axi record list Opportunity --where "amount>1000" --where stage=in:New,Prospecting --since 30d

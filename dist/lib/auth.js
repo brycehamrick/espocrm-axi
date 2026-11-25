@@ -1,30 +1,44 @@
 import { AxiError } from "axi-sdk-js";
-/** Fail fast with actionable guidance when the instance is not configured. */
+export { hasCredential } from "./env.js";
+/**
+ * Fail fast with actionable guidance when the instance is not configured.
+ * Order matters: flag validation happens before this, network after.
+ */
 export function requireAuth(ctx, commandPath) {
-    const missing = [];
-    if (!ctx.config.domain)
-        missing.push("ESPO_CRM_DOMAIN");
-    if (!ctx.config.apiKey)
-        missing.push("ESPO_CRM_API_KEY");
-    if (missing.length > 0) {
-        throw new AxiError(`${commandPath} requires ${missing.join(" and ")}`, "AUTH_REQUIRED", [
-            "export ESPO_CRM_DOMAIN=crm.example.com  (the hostname you open EspoCRM in)",
-            "export ESPO_CRM_API_KEY=...             (Administration > API Users > API Key)",
-            "For per-user inbox access use a user's auth token: ESPO_CRM_USERNAME=<user> ESPO_CRM_API_KEY=<token>",
+    const { config } = ctx;
+    if (!config.domain) {
+        throw new AxiError(`${commandPath} requires ESPO_CRM_DOMAIN`, "AUTH_REQUIRED", [
+            "export ESPO_CRM_DOMAIN=crm.example.com  (the hostname you open EspoCRM in, or add it to ./.env)",
         ]);
     }
-    if (ctx.config.authMode === "basic" && !ctx.config.username) {
-        throw new AxiError(`${commandPath}: basic auth requires ESPO_CRM_USERNAME`, "VALIDATION_ERROR", [
-            "Set the user the token belongs to, or ESPO_CRM_AUTH_MODE=api-key",
+    if (config.authMode === "basic") {
+        if (!config.username) {
+            throw new AxiError(`${commandPath}: basic auth requires ESPO_CRM_AUTH_USER`, "VALIDATION_ERROR", [
+                "Set ESPO_CRM_AUTH_USER=<username> (the account the token/password belongs to)",
+                "Or ESPO_CRM_AUTH_MODE=api-key to use an API User key instead",
+            ]);
+        }
+        if (!config.apiKey && !config.password) {
+            throw new AxiError(`${commandPath}: basic auth needs ESPO_CRM_AUTH_PASSWORD (bootstraps a token) or a stored token in ESPO_CRM_API_KEY`, "AUTH_REQUIRED", [
+                "export ESPO_CRM_AUTH_USER=<username> ESPO_CRM_AUTH_PASSWORD=<password>  - a fresh token is bootstrapped per run",
+                "Or store a current token: ESPO_CRM_API_KEY=<token> (run `espocrm-axi auth refresh --write-env` to persist one)",
+            ]);
+        }
+        return;
+    }
+    if (!config.apiKey) {
+        throw new AxiError(`${commandPath} requires ESPO_CRM_API_KEY`, "AUTH_REQUIRED", [
+            "API User: export ESPO_CRM_API_KEY=<key>  (Administration > API Users > API Key)",
+            "Live user: export ESPO_CRM_AUTH_MODE=basic ESPO_CRM_AUTH_USER=<user> ESPO_CRM_AUTH_PASSWORD=<password>",
         ]);
     }
-    if (ctx.config.authMode === "hmac" && !ctx.config.secretKey) {
+    if (config.authMode === "hmac" && !config.secretKey) {
         throw new AxiError(`${commandPath}: hmac auth requires ESPO_CRM_SECRET_KEY`, "VALIDATION_ERROR");
     }
 }
-/** Hint appended when the client refreshed an expired token in-process. */
+/** Hint appended when the client bootstrapped a token in-process. */
 export function refreshedHint(ctx) {
     return ctx.client.auth.refreshed
-        ? ["Auth token had expired and was refreshed from ESPO_CRM_PASSWORD for this run only; run `espocrm-axi auth refresh --write-env` to store it"]
+        ? ["Auth token was bootstrapped from ESPO_CRM_AUTH_PASSWORD for this run only; run `espocrm-axi auth refresh --write-env` to store one"]
         : [];
 }

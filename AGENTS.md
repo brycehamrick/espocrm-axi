@@ -52,10 +52,12 @@ every change:
 - **Uniform row keys**: build list rows with `projectRows()` (null for missing
   columns) so TOON keeps the tabular form; use plain array keys (`leads`), never a
   hand-rolled `leads[3]{...}` key.
-- **Credentials in basic mode are short-lived user tokens.** The client bootstraps a
-  fresh token in-process on 401 when `ESPO_CRM_PASSWORD` is set, retries once, and
-  never writes it anywhere except `auth refresh --write-env`. Never retry auth more
-  than once: the server escalates 401 to a 403 lockout after a handful of failures.
+- **Credentials in basic mode are short-lived user tokens.** Env names: `ESPO_CRM_AUTH_USER` /
+  `ESPO_CRM_AUTH_PASSWORD` (primary), `ESPO_CRM_USERNAME` / `ESPO_CRM_PASSWORD` (aliases),
+  `ESPO_CRM_API_KEY` optional stored token. The client bootstraps a token in-process when
+  none is stored and again on 401 when the password is set, retries once, and never writes
+  it anywhere except `auth refresh --write-env`. Never retry auth more than once: the
+  server escalates 401 to a 403 lockout after a handful of failures.
 
 ## Layout
 
@@ -98,7 +100,13 @@ sessions without an explicit ask.
 - Sending = `status: "Sending"` (create or PUT); never `status: "Sent"`. Verify
   `dateSent`; failures return HTTP 500 `{id, message}` and leave a Draft.
 - Inbox membership is per user (`email_user`), so inbox/sent/drafts/archive/read
-  flags require a user token (`ESPO_CRM_USERNAME`), not an API key.
+  flags require a live user credential (`ESPO_CRM_AUTH_MODE=basic`), not an API key.
+- Team/group folders are listed with `inFolder` = `group:<GroupEmailFolder id>`
+  (`email folder <name>`); their unread counts are keyed `group:<id>`. Replying to a
+  group-folder email sends from that mailbox by default; fresh sends from the group
+  address land in the user's Sent view, not the folder.
+- `email send|reply|draft --dry-run` resolves everything and prints the payload
+  without uploading or sending - use it for live verification of derived fields.
 - `GET /Email/{id}` marks read. Email lists have counting disabled (`total` -1/-2).
 - Error messages travel in the `X-Status-Reason` header; bodies are often empty.
 - Datetimes are UTC `YYYY-MM-DD HH:mm:ss`; compare after normalizing.

@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import { AxiError } from "axi-sdk-js";
 import { emailCommand, buildBody, normalizeAddress, replySubject, splitAddresses } from "../src/commands/email.js";
 import { ERR, OK, OK_LIST, contextFor, lastUrl, type Recorded } from "./helpers.js";
@@ -64,6 +67,27 @@ describe("email send", () => {
     expect(JSON.stringify(output)).toContain("NOT sent");
   });
 
+  it("--dry-run resolves from/attachments and sends nothing (no gate, no upload, no POST)", async () => {
+    const dir = mkdtempSync(resolve(tmpdir(), "espo-dry-"));
+    writeFileSync(resolve(dir, "a.txt"), "hello");
+    const { output, calls } = await run(["send", "--to", "ada@example.com", "--subject", "Hi", "--text", "x", "--attach", resolve(dir, "a.txt"), "--dry-run"], [USER]);
+    expect(calls).toHaveLength(1); // only App/user for the default --from
+    expect(new URL(calls[0]!.url).pathname).toBe("/api/v1/App/user");
+    expect(output).toMatchObject({ dry_run: { would: "send", status: "Sending", from: "ada@example.com", to: "ada@example.com", body: "x" } });
+    expect(JSON.stringify(output)).toContain("would upload a.txt");
+    rmSync(dir, { recursive: true, force: true });
+    const draft = await run(["draft", "--to", "ada@example.com", "--text", "x", "--dry-run"], [USER]);
+    expect(draft.output).toMatchObject({ dry_run: { would: "create draft", status: "Draft" } });
+    expect(draft.calls).toHaveLength(1);
+  });
+
+  it("reply --dry-run shows the derived reply without sending", async () => {
+    const original = { id: "in1", name: "Pitch idea", fromAddress: "jane@example.com", replyToAddress: "noreply@example.com", parentType: "Lead", parentId: "l1" };
+    const { output, calls } = await run(["reply", "in1", "--text", "x", "--dry-run"], [OK_LIST([original], 1), USER]);
+    expect(calls.some((c) => c.method === "POST" && new URL(c.url).pathname === "/api/v1/Email")).toBe(false);
+    expect(output).toMatchObject({ dry_run: { would: "send", to: "noreply@example.com", name: "Re: Pitch idea", repliedId: "in1", parentType: "Lead" } });
+  });
+
   it("creating a draft never sends and links attachments", async () => {
     const { output, calls } = await run(["draft", "--to", "ada@example.com", "--subject", "Later", "--text", "x", "--confirm"], [USER, OK({ id: "d1", status: "Draft" })]);
     expect(postBody(calls, "/Email")).toMatchObject({ status: "Draft", from: "ada@example.com" });
@@ -94,6 +118,15 @@ describe("email reply", () => {
     const body = postBody(calls, "/Email");
     expect(body).toMatchObject({ status: "Sending", to: "noreply@example.com", name: "Re: Pitch idea", repliedId: "in1", parentType: "Lead", parentId: "l1" });
     expect(output).toMatchObject({ sent: { thread: "in1 -> e1" } });
+  });
+
+  it("replies inside a group folder default --from to that group's mailbox address", async () => {
+    const GROUP_ORIGINAL = { ...ORIGINAL, groupFolderId: "gf1", groupFolderName: "Collabs" };
+    const { calls, output } = await run(["reply", "in1", "--text", "x", "--confirm"], [OK_LIST([GROUP_ORIGINAL], 1), OK_LIST([{ id: "mb1", emailAddress: "collabs@example.com" }]), OK(SENT)]);
+    expect(new URL(calls[1]!.url).pathname).toBe("/api/v1/InboundEmail");
+    expect(new URL(calls[1]!.url).searchParams.get("where[0][value]")).toBe("gf1");
+    expect(postBody(calls, "/Email").from).toBe("collabs@example.com");
+    expect(output).toMatchObject({ sent: { from: "collabs@example.com" } });
   });
 
   it("--all copies original cc, explicit --to/--subject win", async () => {
@@ -178,9 +211,31 @@ describe("email lists", () => {
     expect(output).toMatchObject({ count: 0, result: "0 emails in drafts" });
   });
 
-  it("folders combine personal, group, and unread counts", async () => {
+  it("folders combine personal, group, and unread counts with their filter ids", async () => {
     const { output } = await run(["folders"], [OK_LIST([{ id: "f1", name: "Clients" }]), OK_LIST([{ id: "g1", name: "PR" }]), OK({ inbox: 2, "group:g1": 5 })]);
-    expect(output).toMatchObject({ unread_inbox: 2, personal_folders: [{ id: "f1", name: "Clients" }], group_folders: [{ id: "g1", name: "PR", unread: 5 }] });
+    expect(output).toMatchObject({ unread_inbox: 2, personal_folders: [{ id: "f1", name: "Clients" }], group_folders: [{ id: "g1", name: "PR", unread: 5, filter: "group:g1" }] });
+  });
+
+  it("email folder <name> lists a group folder via inFolder=group:<id>; personal folders use the id", async () => {
+    const group = OK_LIST([{ id: "g1", name: "Collabs" }]);
+    const personal = OK_LIST([{ id: "p1", name: "Later" }]);
+    const { calls, output } = await run(["folder", "collabs", "--unread", "--limit", "5"], [group, personal, OK_LIST([{ id: "e1", name: "Hi", fromEmailAddressName: "a@b.com", isRead: false }], -1)]);
+    const url = lastUrl(calls.slice(0, 3));
+    expect(url.searchParams.get("where[0][type]")).toBe("inFolder");
+    expect(url.searchParams.get("where[0][value]")).toBe("group:g1");
+    expect(url.searchParams.get("where[1][value]") ?? url.searchParams.get("where[1][attribute]")).toBe("isRead");
+    expect(output).toMatchObject({ folder: "Collabs", count: 1 });
+
+    const second = await run(["folder", "later"], [group, personal, OK_LIST([{ id: "e2", name: "x", fromEmailAddressName: "a@b.com" }], -2)]);
+    expect(lastUrl(second.calls.slice(0, 3)).searchParams.get("where[0][value]")).toBe("p1");
+    expect(second.output).toMatchObject({ folder: "Later" });
+
+    const { ctx } = contextFor([group, personal]);
+    const error = await emailCommand(["folder", "nope"], ctx).catch((e: unknown) => e as AxiError);
+    expect(error.code).toBe("NOT_FOUND");
+    expect(error.message).toContain('no folder named "nope"');
+    expect(error.suggestions.join(" ")).toContain("Collabs (group:g1)");
+    expect(error.suggestions.join(" ")).toContain("Later (p1)");
   });
 
   it("accounts redact passwords", async () => {

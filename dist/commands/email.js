@@ -23,18 +23,22 @@ import { readUploadFile, uploadAttachment } from "../lib/attachment.js";
  */
 export const EMAIL_HELP = `espocrm-axi email - inbox, sending, and mailbox management
 
-reading (per-user folders need a user token: ESPO_CRM_USERNAME):
+reading (per-user folders need a live user credential: ESPO_CRM_AUTH_MODE=basic):
   email inbox|sent|archive|drafts|important|trash|all [flags]   --unread --since 7d --from a@b --text q --limit
+  email folder <name|id> [flags]           a personal or team/group folder by name or id (e.g. email folder Collabs)
   email get <id> [--full] [--html] [--json]     NOTE: reading marks it read
   email thread <id>                              an email plus its replies, oldest first
-  email folders                                  personal + group folders with unread counts
+  email folders                                  personal + group (team) folders with unread counts and their filter ids
   email count                                    unread counts per folder
 
-sending (--confirm required; delivery is verified via dateSent):
+sending (--confirm required; delivery is verified via dateSent; --dry-run prints the payload and sends nothing):
   email send --to a@b,c@d --subject "..." (--text "..." | --text-file f | --html "..." | --html-file f)
              [--cc] [--bcc] [--from addr] [--parent-type Lead --parent-id <id>] [--attach file ...]
+             --from defaults to your own address; pass a shared group mailbox address
+             (e.g. --from collabs@example.com) to send as the team inbox
              [--attach-id id,...] [--teams a,b] [--signature-file f] [--wait 30]
-  email reply <emailId> (--text ... | --html ...) [--all] [--cc] [--attach ...]   Re: + threading
+  email reply <emailId> (--text ... | --html ...) [--all] [--cc] [--attach ...]   Re: + threading;
+             replies inside a group folder send from that mailbox by default
   email draft <...same content flags as send>    create a Draft (no send)
   email send <draftId>                           queue an existing draft (PUT status=Sending)
   email schedule <draftId> --at "YYYY-MM-DD HH:mm"  send later via the cron job
@@ -81,6 +85,7 @@ const CONTENT_FLAGS = {
     "signature-file": { type: "string" },
     wait: { type: "string" },
     all: { type: "boolean" },
+    "dry-run": { type: "boolean" },
     confirm: { type: "boolean" },
     json: { type: "boolean" },
 };
@@ -98,7 +103,7 @@ const SEND_TEST_FLAGS = {
     username: { type: "string" }, password: { type: "string" }, auth: { type: "string" }, security: { type: "string" },
     "from-name": { type: "string" }, confirm: { type: "boolean" },
 };
-const EMAIL_SELECT = ["id", "name", "status", "fromEmailAddressName", "fromString", "toEmailAddressesNames", "dateSent", "createdAt", "isRead", "hasAttachment", "parentType", "parentId", "bodyPlain"];
+const EMAIL_SELECT = ["id", "name", "status", "fromEmailAddressName", "fromString", "toEmailAddressesNames", "dateSent", "createdAt", "isRead", "hasAttachment", "parentType", "parentId", "groupFolderId", "groupFolderName", "bodyPlain"];
 const DEFAULT_WAIT_SECONDS = 30;
 const POLL_INTERVAL_MS = 3_000;
 export async function emailCommand(args, ctx) {
@@ -128,7 +133,7 @@ export async function emailCommand(args, ctx) {
         case "unarchive": return moveToFolder(rest, ctx, "inbox", "unarchive");
         case "move": return emailMove(rest, ctx);
         case "folders": return emailFolders(rest, ctx);
-        case "folder": return emailFolderManage(rest, ctx);
+        case "folder": return rest[0] === "create" || rest[0] === "delete" ? emailFolderManage(rest, ctx) : emailFolderBySelector(rest, ctx);
         case "count": return emailCount(rest, ctx);
         case "accounts": return recordListRedacted(rest, ctx, "EmailAccount", "email accounts");
         case "account": return emailAccountAction(rest, ctx);
@@ -156,8 +161,8 @@ function emailRow(row, show) {
         attachments: row["hasAttachment"] === true ? true : undefined,
     });
 }
-async function emailFolder(folder, args, ctx) {
-    const commandPath = `espocrm-axi email ${folder}`;
+async function emailFolder(folder, args, ctx, label = folder) {
+    const commandPath = `espocrm-axi email ${label}`;
     const { values, positionals } = parseFlags(args, commandPath, FOLDER_FLAGS);
     forbidExtraPositionals(positionals, 0, commandPath);
     requireAuth(ctx, commandPath);
@@ -172,13 +177,13 @@ async function emailFolder(folder, args, ctx) {
     const outcome = await fetchRecords(ctx, "Email", params, extra);
     const show = folder === "sent" || folder === "drafts" ? "to" : "from";
     const rows = outcome.rows.map((r) => emailRow(r, show));
-    const out = { folder, count: rows.length };
+    const out = { folder: label, count: rows.length };
     if (outcome.total === -1)
         out["more"] = true;
     if (ctx.config.authMode !== "basic")
-        out["note"] = "per-user folders need a user token (ESPO_CRM_USERNAME); an API user has no inbox";
+        out["note"] = "per-user folders need a live user credential (ESPO_CRM_AUTH_MODE=basic); an API user has no inbox";
     if (rows.length === 0)
-        out["result"] = `0 emails in ${folder}`;
+        out["result"] = `0 emails in ${label}`;
     else
         out["emails"] = rows;
     const help = [];
@@ -225,6 +230,7 @@ async function emailGet(args, ctx) {
             subject: asString(record["name"]),
             date: asString(record["dateSent"]) ?? asString(record["createdAt"]),
             parent: asString(record["parentType"]) ? `${asString(record["parentType"])}:${asString(record["parentId"])}` : undefined,
+            group_folder: asString(record["groupFolderName"]) ?? undefined,
             isRead: record["isRead"],
             attachments: attIds > 0 ? `${attIds}: ${names("attachmentsNames") ?? ""}`.trim() : undefined,
         }),
@@ -276,11 +282,11 @@ async function emailFolders(args, ctx) {
     const out = {
         unread_inbox: unread["inbox"] ?? 0,
         personal_folders: personal.list.map((f) => compact({ id: asString(f["id"]), name: asString(f["name"]), unread: unread[asString(f["id"]) ?? ""] })),
-        group_folders: group.list.map((f) => compact({ id: asString(f["id"]), name: asString(f["name"]), unread: unread[`group:${asString(f["id"]) ?? ""}`] })),
+        group_folders: group.list.map((f) => compact({ id: asString(f["id"]), name: asString(f["name"]), unread: unread[`group:${asString(f["id"]) ?? ""}`], filter: `group:${asString(f["id"]) ?? ""}` })),
     };
     if (personal.list.length === 0 && group.list.length === 0)
         out["result"] = "0 folders (only the built-in inbox/archive/trash)";
-    return withHelp(out, ["Move mail: `espocrm-axi email move <ids...> --folder <id>` (or `archive` / `group:<id>`)"], values["json"] === true);
+    return withHelp(out, ["Open one: `espocrm-axi email folder <name>` (e.g. `email folder Collabs --unread`)", "Move mail: `espocrm-axi email move <ids...> --folder <id>` (or `archive` / `group:<id>`)"], values["json"] === true);
 }
 async function emailFolderManage(args, ctx) {
     const sub = args[0];
@@ -311,6 +317,41 @@ async function emailCount(args, ctx) {
     requireAuth(ctx, commandPath);
     const counts = asRecord(await ctx.client.request("GET", "Email/inbox/notReadCounts")) ?? {};
     return renderResult({ unread: counts, help: ["Run `espocrm-axi email inbox --unread` to list them"] }, values["json"] === true);
+}
+async function loadFolders(ctx) {
+    const [group, personal] = await Promise.all([
+        ctx.client.list("GroupEmailFolder", { maxSize: 200, select: ["id", "name"], orderBy: "order", order: "asc" }),
+        ctx.client.list("EmailFolder", { maxSize: 200, select: ["id", "name"], orderBy: "order", order: "asc" }),
+    ]);
+    const pack = (rows) => rows.map((r) => ({ id: asString(r["id"]) ?? "", name: asString(r["name"]) ?? "" })).filter((r) => r.id);
+    return { group: pack(group.list), personal: pack(personal.list) };
+}
+/** Resolve a folder by id or name (case-insensitive) into the `inFolder` value the API expects. */
+export async function resolveFolder(ctx, selector, commandPath) {
+    if (selector.startsWith("group:"))
+        return { value: selector, label: `group folder ${selector.slice(6) || "(all)"}`, kind: "group" };
+    const folders = await loadFolders(ctx);
+    const needle = selector.toLowerCase();
+    const match = (rows) => rows.find((f) => f.id === selector || f.name.toLowerCase() === needle);
+    const group = match(folders.group);
+    if (group)
+        return { value: `group:${group.id}`, label: group.name, kind: "group" };
+    const personal = match(folders.personal);
+    if (personal)
+        return { value: personal.id, label: personal.name, kind: "personal" };
+    const available = [...folders.group.map((f) => `${f.name} (group:${f.id})`), ...folders.personal.map((f) => `${f.name} (${f.id})`)];
+    throw new AxiError(`${commandPath}: no folder named "${selector}"`, "NOT_FOUND", [
+        available.length ? `Available: ${available.join(", ")}` : "No folders exist yet (only the built-in inbox/archive/trash)",
+    ]);
+}
+async function emailFolderBySelector(args, ctx) {
+    const commandPath = "espocrm-axi email folder";
+    const selector = args[0];
+    if (!selector || selector.startsWith("-"))
+        return "espocrm-axi email folder - list a personal or group (team) folder\n\n  email folder <name|id> [list flags]     e.g. email folder Collabs --unread\n  email folder create --name <name> --confirm\n  email folder delete <id> --confirm\n\nGroup folders also accept group:<id>; `espocrm-axi email folders` lists them with unread counts.";
+    requireAuth(ctx, commandPath);
+    const target = await resolveFolder(ctx, selector, commandPath);
+    return emailFolder(target.value, args.slice(1), ctx, target.label);
 }
 const EMAIL_RE = /^[^\s<>@,;]+@[^\s@<>]+\.[^\s@<>]+$/;
 export function normalizeAddress(raw) {
@@ -402,7 +443,8 @@ async function emailSend(args, ctx, status) {
     const { values } = parseFlags(args, commandPath, CONTENT_FLAGS);
     requireAuth(ctx, commandPath);
     const compose = buildCompose(values, commandPath, { requireTo: true, requireSubject: true, requireContent: true });
-    requireConfirm(values, commandPath, `send "${compose.subject}" to ${compose.to.join(", ")}${compose.cc.length ? ` (cc ${compose.cc.join(", ")})` : ""}`);
+    if (values["dry-run"] !== true)
+        requireConfirm(values, commandPath, `send "${compose.subject}" to ${compose.to.join(", ")}${compose.cc.length ? ` (cc ${compose.cc.join(", ")})` : ""}`);
     return deliver(ctx, compose, { status, values, commandPath });
 }
 async function emailDraft(args, ctx) {
@@ -410,15 +452,21 @@ async function emailDraft(args, ctx) {
     const { values } = parseFlags(args, commandPath, CONTENT_FLAGS);
     requireAuth(ctx, commandPath);
     const compose = buildCompose(values, commandPath, { requireTo: false, requireSubject: false, requireContent: true });
-    requireConfirm(values, commandPath, `create a draft${compose.subject ? ` "${compose.subject}"` : ""}${compose.to.length ? ` to ${compose.to.join(", ")}` : ""}`);
+    if (values["dry-run"] !== true)
+        requireConfirm(values, commandPath, `create a draft${compose.subject ? ` "${compose.subject}"` : ""}${compose.to.length ? ` to ${compose.to.join(", ")}` : ""}`);
     return deliver(ctx, compose, { status: "Draft", values, commandPath });
 }
 /** Create the Email record (uploading attachments first) and verify transmission when sending. */
 async function deliver(ctx, compose, opts) {
     const from = await resolveFrom(ctx, compose.from);
     const attachments = [...compose.attachIds];
+    const dryRun = opts.values["dry-run"] === true;
     for (const path of compose.attachPaths) {
         const file = readUploadFile(path, opts.commandPath);
+        if (dryRun) {
+            attachments.push(`(would upload ${file.name}, ${file.bytes.length} bytes)`);
+            continue;
+        }
         const uploaded = await uploadAttachment(ctx, file, { field: "attachments", relatedType: "Email" });
         attachments.push(uploaded.id);
     }
@@ -437,6 +485,11 @@ async function deliver(ctx, compose, opts) {
         attachmentsIds: attachments.length ? attachments : undefined,
         repliedId: opts.repliedId,
     });
+    if (dryRun) {
+        return withHelp({ dry_run: compact({ would: opts.status === "Sending" ? "send" : "create draft", ...payload, attachments: compose.attachPaths.length || undefined, signature: compose.signatureFile ?? undefined }) }, [
+            "Nothing was sent or uploaded; rerun without --dry-run and with --confirm to apply",
+        ], opts.values["json"] === true);
+    }
     const record = asRecord(await ctx.client.request("POST", "Email", { body: payload, timeoutMs: 120_000 }));
     const id = asString(record?.["id"]);
     if (!id)
@@ -510,12 +563,18 @@ async function emailReply(args, ctx) {
     const id = validId(requirePositional(positionals, 0, "emailId", commandPath));
     forbidExtraPositionals(positionals, 1, commandPath);
     requireAuth(ctx, commandPath);
-    requireConfirm(values, commandPath, `send a reply to email ${id}`);
+    if (values["dry-run"] !== true)
+        requireConfirm(values, commandPath, `send a reply to email ${id}`);
     const original = (await fetchRecords(ctx, "Email", { maxSize: 1, select: [...EMAIL_SELECT, "replyToAddress", "replyToString", "fromAddress", "cc"], where: [{ type: "equals", attribute: "id", value: id }] })).rows[0];
     if (!original)
         throw new AxiError(`Email ${id} not found`, "NOT_FOUND");
     const subject = requireString(values, "subject", commandPath) ?? replySubject(asString(original["name"]));
     const valuesWithTo = { ...values, to: values["to"] ?? asString(original["replyToAddress"]) ?? asString(original["fromAddress"]) ?? asString(original["fromEmailAddressName"]) };
+    if (values["from"] === undefined && asString(original["groupFolderId"])) {
+        const groupFrom = await groupMailboxAddress(ctx, asString(original["groupFolderId"]));
+        if (groupFrom)
+            valuesWithTo.from = groupFrom;
+    }
     if (typeof valuesWithTo.to !== "string")
         throw new AxiError("could not determine the reply address; pass --to", "VALIDATION_ERROR");
     if (values["all"] === true && values["cc"] === undefined) {
@@ -526,6 +585,18 @@ async function emailReply(args, ctx) {
     compose.parentType = compose.parentType ?? asString(original["parentType"]);
     compose.parentId = compose.parentId ?? asString(original["parentId"]);
     return deliver(ctx, compose, { status: "Sending", values, commandPath, repliedId: id, subject });
+}
+/** Email address of the group mailbox (InboundEmail) feeding a group folder. */
+export async function groupMailboxAddress(ctx, groupFolderId) {
+    try {
+        const result = await ctx.client.list("InboundEmail", { maxSize: 1, select: ["id", "emailAddress"], where: [{ type: "equals", attribute: "groupEmailFolderId", value: groupFolderId }] });
+        return asString(result.list[0]?.["emailAddress"]);
+    }
+    catch (error) {
+        if (error instanceof AxiError && error.code === "AUTH_REQUIRED")
+            return undefined;
+        throw error;
+    }
 }
 export function replySubject(subject) {
     const base = subject?.trim() || "(no subject)";
